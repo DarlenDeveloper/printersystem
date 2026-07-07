@@ -1,0 +1,49 @@
+<UserControl x:Class="ChequeMate.App.Views.ChequeEntryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="New Cheque Entry" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}">
+            <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                <TextBlock Text="Template / Bank" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
+                          DisplayMemberPath="TemplateName" Margin="0,2,0,12"/>
+
+                <TextBlock Text="Payee Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBox Text="{Binding Payee, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
+
+                <TextBlock Text="Amount" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBox Text="{Binding AmountFigures, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,4"/>
+                <TextBlock Text="{Binding AmountWords}" FontStyle="Italic" 
+                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,12" TextWrapping="Wrap"/>
+
+                <TextBlock Text="Date" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <DatePicker SelectedDate="{Binding ChequeDate}" Margin="0,2,0,12"/>
+
+                <TextBlock Text="Cheque Number (optional)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBox Text="{Binding ChequeNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
+
+                <TextBlock Text="Memo (optional)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBox Text="{Binding Memo, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,16"/>
+
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Add to Print Queue" Command="{Binding AddToQueueCommand}" 
+                            Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                    <Button Content="Import CSV" Command="{Binding ImportCsvCommand}" 
+                            Style="{StaticResource PrimaryButton}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" 
+                   Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+    </Grid>
+</UserControl>

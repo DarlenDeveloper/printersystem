@@ -1,0 +1,134 @@
+<UserControl x:Class="ChequeMate.App.Views.TemplateEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ChequeMate.App.ViewModels">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="280"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Top toolbar -->
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Template Editor" FontSize="18" FontWeight="SemiBold" 
+                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button Content="Import Cheque Image" Command="{Binding ImportChequeImageCommand}" 
+                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+            <Button Content="+ Add Field" Command="{Binding AddFieldCommand}" 
+                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+            <Button Content="Save Template" Command="{Binding SaveTemplateCommand}" 
+                    Style="{StaticResource PrimaryButton}"/>
+        </StackPanel>
+
+        <!-- Canvas area (cheque image + draggable fields) -->
+        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorder}" Margin="0,0,12,0">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Canvas x:Name="ChequeCanvas" Background="#F1F5F9" ClipToBounds="True"
+                        Width="{Binding PaperWidthMm, Converter={StaticResource MmToPixelConverter}}"
+                        Height="{Binding PaperHeightMm, Converter={StaticResource MmToPixelConverter}}">
+                    <!-- Cheque background image -->
+                    <Image Source="{Binding ChequeImage}" Stretch="Fill"
+                           Width="{Binding PaperWidthMm, Converter={StaticResource MmToPixelConverter}}"
+                           Height="{Binding PaperHeightMm, Converter={StaticResource MmToPixelConverter}}"
+                           Opacity="0.6"/>
+
+                    <!-- Field rectangles rendered via ItemsControl -->
+                    <ItemsControl ItemsSource="{Binding Fields}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:TemplateFieldViewModel}">
+                                <Border BorderBrush="Red" BorderThickness="1" Background="#30FF0000"
+                                        Width="{Binding WidthMm, Converter={StaticResource MmToPixelConverter}}"
+                                        Height="{Binding HeightMm, Converter={StaticResource MmToPixelConverter}}"
+                                        ToolTip="{Binding DisplayName}" Cursor="SizeAll">
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="9" 
+                                               Foreground="Red" Margin="2"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" 
+                                        Value="{Binding PositionXMm, Converter={StaticResource MmToPixelConverter}}"/>
+                                <Setter Property="Canvas.Top" 
+                                        Value="{Binding PositionYMm, Converter={StaticResource MmToPixelConverter}}"/>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                    </ItemsControl>
+                </Canvas>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Right panel: properties -->
+        <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardBorder}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- Template settings -->
+                    <TextBlock Text="Template Settings" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <TextBlock Text="Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Paper Width (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding PaperWidthMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Paper Height (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding PaperHeightMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Offset X (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding OffsetXMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Offset Y (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding OffsetYMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
+
+                    <Separator Margin="0,0,0,12"/>
+
+                    <!-- Selected field properties -->
+                    <TextBlock Text="Selected Field" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <TextBlock Text="Type" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <ComboBox ItemsSource="{Binding Source={StaticResource FieldTypeValues}}"
+                              SelectedItem="{Binding SelectedField.FieldType}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Label" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.Label, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="X (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.PositionXMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Y (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.PositionYMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Width (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.WidthMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Height (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.HeightMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Font" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.FontFamily, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Font Size (pt)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SelectedField.FontSizePt, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <CheckBox Content="Bold" IsChecked="{Binding SelectedField.IsBold}" Margin="0,0,0,8"/>
+
+                    <Button Content="Remove Field" Command="{Binding RemoveFieldCommand}" 
+                            Foreground="White" Background="#DC2626" Padding="12,6" Margin="0,8,0,0"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Status bar -->
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusMessage}" 
+                   Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+    </Grid>
+</UserControl>
