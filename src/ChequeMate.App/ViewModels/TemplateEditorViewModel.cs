@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -27,6 +28,12 @@ public partial class TemplateEditorViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<TemplateFieldViewModel> _fields = new();
     [ObservableProperty] private TemplateFieldViewModel? _selectedField;
     [ObservableProperty] private string _statusMessage = string.Empty;
+
+    partial void OnSelectedFieldChanged(TemplateFieldViewModel? oldValue, TemplateFieldViewModel? newValue)
+    {
+        if (oldValue != null) oldValue.IsSelected = false;
+        if (newValue != null) newValue.IsSelected = true;
+    }
 
     public TemplateEditorViewModel(ITemplateService templateService, IBankProfileService bankService)
     {
@@ -210,6 +217,7 @@ public partial class TemplateFieldViewModel : ObservableObject
     [ObservableProperty] private double _fontSizePt = 10;
     [ObservableProperty] private TextAlignment _alignment = TextAlignment.Left;
     [ObservableProperty] private bool _isBold;
+    [ObservableProperty] private bool _isSelected;
 
     public string DisplayName => Label ?? FieldType.ToString();
 }

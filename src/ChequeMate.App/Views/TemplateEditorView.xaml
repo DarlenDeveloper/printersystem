@@ -31,7 +31,10 @@
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                 <Canvas x:Name="ChequeCanvas" Background="#F1F5F9" ClipToBounds="True"
                         Width="{Binding PaperWidthMm, Converter={StaticResource MmToPixelConverter}}"
-                        Height="{Binding PaperHeightMm, Converter={StaticResource MmToPixelConverter}}">
+                        Height="{Binding PaperHeightMm, Converter={StaticResource MmToPixelConverter}}"
+                        MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+                        MouseMove="Canvas_MouseMove"
+                        MouseLeftButtonUp="Canvas_MouseLeftButtonUp">
                     <!-- Cheque background image -->
                     <Image Source="{Binding ChequeImage}" Stretch="Fill"
                            Width="{Binding PaperWidthMm, Converter={StaticResource MmToPixelConverter}}"
@@ -47,12 +50,27 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:TemplateFieldViewModel}">
-                                <Border BorderBrush="Red" BorderThickness="1" Background="#30FF0000"
+                                <Border BorderThickness="1" Background="#30FF0000"
                                         Width="{Binding WidthMm, Converter={StaticResource MmToPixelConverter}}"
                                         Height="{Binding HeightMm, Converter={StaticResource MmToPixelConverter}}"
-                                        ToolTip="{Binding DisplayName}" Cursor="SizeAll">
+                                        ToolTip="{Binding DisplayName}"
+                                        MouseLeftButtonDown="Field_MouseLeftButtonDown"
+                                        MouseMove="Field_MouseMove"
+                                        MouseLeftButtonUp="Field_MouseLeftButtonUp">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="Red"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                                                    <Setter Property="BorderThickness" Value="2"/>
+                                                    <Setter Property="Background" Value="#302563EB"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <TextBlock Text="{Binding DisplayName}" FontSize="9" 
-                                               Foreground="Red" Margin="2"/>
+                                               Foreground="Red" Margin="2" IsHitTestVisible="False"/>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -65,6 +83,11 @@
                             </Style>
                         </ItemsControl.ItemContainerStyle>
                     </ItemsControl>
+
+                    <!-- Rubber-band rectangle for drawing a new field area -->
+                    <Rectangle x:Name="SelectionRectangle" Visibility="Collapsed"
+                               Stroke="#2563EB" StrokeThickness="1" StrokeDashArray="3 2"
+                               Fill="#202563EB" IsHitTestVisible="False"/>
                 </Canvas>
             </ScrollViewer>
         </Border>
