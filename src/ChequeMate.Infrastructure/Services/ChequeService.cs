@@ -21,6 +21,7 @@ public class ChequeService : IChequeService
     {
         return await _db.ChequeEntries
             .Include(e => e.Template)
+                .ThenInclude(t => t!.Fields)
             .Where(e => e.PrintStatus == PrintStatus.Pending)
             .OrderBy(e => e.CreatedAt)
             .ToListAsync();
@@ -30,6 +31,7 @@ public class ChequeService : IChequeService
     {
         return await _db.ChequeEntries
             .Include(e => e.Template)
+                .ThenInclude(t => t!.Fields)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
     }

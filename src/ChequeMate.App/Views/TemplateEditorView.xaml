@@ -102,16 +102,25 @@
                     <TextBox Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Paper Width (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding PaperWidthMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding PaperWidthMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Paper Height (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding PaperHeightMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding PaperHeightMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Offset X (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding OffsetXMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding OffsetXMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Offset Y (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding OffsetYMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
+                    <TextBox Text="{Binding OffsetYMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,12"/>
+
+                    <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" 
+                            CornerRadius="6" Padding="10,8" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="💡 A4 Test Print Tip" FontWeight="SemiBold" FontSize="11" Foreground="#C2410C" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#9A3412"
+                                       Text="For A4 test prints: set Paper Width=210, Height=297. Place your cheque in the top-left corner of the A4 sheet and check field alignment. Adjust Offset X/Y to nudge all fields together."/>
+                        </StackPanel>
+                    </Border>
 
                     <Separator Margin="0,0,0,12"/>
 
@@ -125,16 +134,16 @@
                     <TextBox Text="{Binding SelectedField.Label, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="X (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding SelectedField.PositionXMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding SelectedField.PositionXMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Y (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding SelectedField.PositionYMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding SelectedField.PositionYMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Width (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding SelectedField.WidthMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding SelectedField.WidthMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Height (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox Text="{Binding SelectedField.HeightMm, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+                    <TextBox Text="{Binding SelectedField.HeightMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
                     <TextBlock Text="Font" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                     <TextBox Text="{Binding SelectedField.FontFamily, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>

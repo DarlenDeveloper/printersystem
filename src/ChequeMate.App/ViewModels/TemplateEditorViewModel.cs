@@ -20,8 +20,8 @@ public partial class TemplateEditorViewModel : ObservableObject
     [ObservableProperty] private ChequeTemplate? _selectedTemplate;
     [ObservableProperty] private BitmapImage? _chequeImage;
     [ObservableProperty] private string _templateName = string.Empty;
-    [ObservableProperty] private double _paperWidthMm = 200;
-    [ObservableProperty] private double _paperHeightMm = 90;
+    [ObservableProperty] private double _paperWidthMm = 170;
+    [ObservableProperty] private double _paperHeightMm = 70;
     [ObservableProperty] private double _offsetXMm;
     [ObservableProperty] private double _offsetYMm;
     [ObservableProperty] private int? _selectedBankId;

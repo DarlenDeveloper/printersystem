@@ -38,22 +38,23 @@ public class PrintService : IPrintService
             if (!string.IsNullOrEmpty(printerName))
                 printDoc.PrinterSettings.PrinterName = printerName;
 
-            // Set custom paper size
+            // Set custom paper size matching the cheque dimensions
             var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
                 printDoc.PrinterSettings, template.PaperWidthMm, template.PaperHeightMm);
             printDoc.DefaultPageSettings.PaperSize = paperSize;
-            printDoc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(0, 0, 0, 0);
+            printDoc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
+
+            // Cheques are landscape if wider than tall
+            printDoc.DefaultPageSettings.Landscape =
+                template.PaperWidthMm > template.PaperHeightMm;
 
             printDoc.PrintPage += (sender, e) =>
             {
                 if (e.Graphics != null)
-                {
                     _engine.RenderCheque(e.Graphics, entry, template);
-                }
                 e.HasMorePages = false;
             };
 
-            // Print synchronously on a background thread
             await Task.Run(() => printDoc.Print());
 
             entry.PrintStatus = PrintStatus.Printed;
@@ -96,14 +97,14 @@ public class PrintService : IPrintService
         var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
             printDoc.PrinterSettings, template.PaperWidthMm, template.PaperHeightMm);
         printDoc.DefaultPageSettings.PaperSize = paperSize;
-        printDoc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(0, 0, 0, 0);
+        printDoc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
+        printDoc.DefaultPageSettings.Landscape =
+            template.PaperWidthMm > template.PaperHeightMm;
 
         printDoc.PrintPage += (sender, e) =>
         {
             if (e.Graphics != null)
-            {
                 _engine.RenderAlignmentTest(e.Graphics, template);
-            }
             e.HasMorePages = false;
         };
 
@@ -114,9 +115,7 @@ public class PrintService : IPrintService
     {
         var printers = new List<string>();
         foreach (string printer in PrinterSettings.InstalledPrinters)
-        {
             printers.Add(printer);
-        }
         return printers;
     }
 }
