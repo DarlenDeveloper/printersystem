@@ -31,6 +31,27 @@ public partial class TemplateEditorView : UserControl
     public TemplateEditorView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is TemplateEditorViewModel vm)
+        {
+            vm.RequestFieldType = ShowFieldPicker;
+        }
+    }
+
+    /// <summary>
+    /// Opens the field picker dialog and returns the chosen FieldType, or null if cancelled.
+    /// </summary>
+    private FieldType? ShowFieldPicker()
+    {
+        var dialog = new FieldPickerDialog
+        {
+            Owner = Window.GetWindow(this)
+        };
+        return dialog.ShowDialog() == true ? dialog.SelectedFieldType : null;
     }
 
     private TemplateEditorViewModel? Vm => DataContext as TemplateEditorViewModel;
@@ -209,9 +230,14 @@ public partial class TemplateEditorView : UserControl
         if (Vm == null)
             return;
 
+        // Ask the user which field type they want before creating it
+        var fieldType = ShowFieldPicker();
+        if (fieldType == null) return; // user cancelled
+
         var field = new TemplateFieldViewModel
         {
-            FieldType = FieldType.Payee,
+            FieldType = fieldType.Value,
+            Label = fieldType.Value.ToString(),
             PositionXMm = Math.Round(left / PixelsPerMm, 1),
             PositionYMm = Math.Round(top / PixelsPerMm, 1),
             WidthMm = Math.Round(width / PixelsPerMm, 1),

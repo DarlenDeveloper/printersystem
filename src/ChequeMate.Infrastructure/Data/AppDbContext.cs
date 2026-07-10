@@ -28,7 +28,8 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.BankProfile)
                   .WithMany(b => b.Templates)
                   .HasForeignKey(e => e.BankProfileId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TemplateField>(entity =>

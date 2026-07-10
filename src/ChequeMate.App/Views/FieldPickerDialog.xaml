@@ -1,0 +1,113 @@
+<Window x:Class="ChequeMate.App.Views.FieldPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add Field"
+        Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="Choose a field type" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <TextBlock Text="Click a field to add it to your template." 
+                   Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,0,0,20"/>
+
+        <UniformGrid Columns="2" >
+
+            <!-- Payee -->
+            <Button Tag="Payee" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,6,6">
+                <StackPanel>
+                    <TextBlock Text="👤" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Payee Name" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Who the cheque is paid to" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Date -->
+            <Button Tag="Date" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="📅" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Date" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Cheque date field" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Amount in Words -->
+            <Button Tag="AmountInWords" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,6,6">
+                <StackPanel>
+                    <TextBlock Text="✍️" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Amount (Words)" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="e.g. Three hundred dollars" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Amount in Figures -->
+            <Button Tag="AmountInFigures" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="💲" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Amount (Figures)" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="e.g. $300.00" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Account Payee -->
+            <Button Tag="AccountPayee" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,6,6">
+                <StackPanel>
+                    <TextBlock Text="🏦" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Account Payee" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Account payee stamp area" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Cheque Number -->
+            <Button Tag="ChequeNumber" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="🔢" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Cheque Number" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Auto-filled cheque number" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Memo -->
+            <Button Tag="Memo" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,6,6">
+                <StackPanel>
+                    <TextBlock Text="📝" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Memo" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Notes / memo line" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Custom -->
+            <Button Tag="Custom" Click="FieldButton_Click" Style="{StaticResource FieldPickerButton}" Margin="0,0,0,6">
+                <StackPanel>
+                    <TextBlock Text="⚙️" FontSize="22" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Custom Text" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+                    <TextBlock Text="Any custom label or text" FontSize="10"
+                               Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+        </UniformGrid>
+
+        <Button Content="Cancel" Click="Cancel_Click" 
+                Padding="12,6" Margin="0,12,0,0"
+                HorizontalAlignment="Right"
+                Background="Transparent"
+                Foreground="{StaticResource MutedTextBrush}"
+                BorderBrush="{StaticResource BorderBrush}"/>
+    </StackPanel>
+</Window>

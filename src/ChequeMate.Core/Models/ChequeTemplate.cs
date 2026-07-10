@@ -3,7 +3,7 @@ namespace ChequeMate.Core.Models;
 public class ChequeTemplate
 {
     public int Id { get; set; }
-    public int BankProfileId { get; set; }
+    public int? BankProfileId { get; set; }
     public string TemplateName { get; set; } = string.Empty;
 
     /// <summary>

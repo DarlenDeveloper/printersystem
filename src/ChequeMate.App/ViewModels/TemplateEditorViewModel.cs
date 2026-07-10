@@ -24,7 +24,7 @@ public partial class TemplateEditorViewModel : ObservableObject
     [ObservableProperty] private double _paperHeightMm = 90;
     [ObservableProperty] private double _offsetXMm;
     [ObservableProperty] private double _offsetYMm;
-    [ObservableProperty] private int _selectedBankId;
+    [ObservableProperty] private int? _selectedBankId;
     [ObservableProperty] private ObservableCollection<TemplateFieldViewModel> _fields = new();
     [ObservableProperty] private TemplateFieldViewModel? _selectedField;
     [ObservableProperty] private string _statusMessage = string.Empty;
@@ -85,15 +85,25 @@ public partial class TemplateEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Set by the View so the ViewModel can request a field type from the user
+    /// without taking a hard dependency on WPF Window classes.
+    /// </summary>
+    public Func<FieldType?>? RequestFieldType { get; set; }
+
     [RelayCommand]
     private void AddField()
     {
+        var fieldType = RequestFieldType?.Invoke();
+        if (fieldType == null) return; // user cancelled
+
         var field = new TemplateFieldViewModel
         {
-            FieldType = FieldType.Payee,
+            FieldType = fieldType.Value,
+            Label = fieldType.Value.ToString(),
             PositionXMm = 20,
             PositionYMm = 20,
-            WidthMm = 80,
+            WidthMm = DefaultWidthForField(fieldType.Value),
             HeightMm = 8,
             FontFamily = "Arial",
             FontSizePt = 10
@@ -101,6 +111,16 @@ public partial class TemplateEditorViewModel : ObservableObject
         Fields.Add(field);
         SelectedField = field;
     }
+
+    private static double DefaultWidthForField(FieldType type) => type switch
+    {
+        FieldType.AmountInWords => 120,
+        FieldType.AmountInFigures => 50,
+        FieldType.Date => 40,
+        FieldType.ChequeNumber => 40,
+        FieldType.AccountPayee => 60,
+        _ => 80
+    };
 
     [RelayCommand]
     private void RemoveField()
@@ -121,40 +141,55 @@ public partial class TemplateEditorViewModel : ObservableObject
             return;
         }
 
-        var template = SelectedTemplate ?? new ChequeTemplate();
-        template.TemplateName = TemplateName;
-        template.BankProfileId = SelectedBankId;
-        template.PaperWidthMm = PaperWidthMm;
-        template.PaperHeightMm = PaperHeightMm;
-        template.OffsetXMm = OffsetXMm;
-        template.OffsetYMm = OffsetYMm;
-        template.ChequeImagePath = ChequeImage?.UriSource?.LocalPath;
-
-        template.Fields.Clear();
-        foreach (var fieldVm in Fields)
+        try
         {
-            template.Fields.Add(new TemplateField
+            var template = SelectedTemplate ?? new ChequeTemplate();
+            template.TemplateName = TemplateName;
+            template.BankProfileId = SelectedBankId;
+            template.PaperWidthMm = PaperWidthMm;
+            template.PaperHeightMm = PaperHeightMm;
+            template.OffsetXMm = OffsetXMm;
+            template.OffsetYMm = OffsetYMm;
+
+            // Safely resolve the image path whether it came from a Uri or a local file dialog
+            if (ChequeImage?.UriSource != null)
+                template.ChequeImagePath = ChequeImage.UriSource.IsFile
+                    ? ChequeImage.UriSource.LocalPath
+                    : ChequeImage.UriSource.AbsolutePath;
+
+            template.Fields.Clear();
+            foreach (var fieldVm in Fields)
             {
-                FieldType = fieldVm.FieldType,
-                Label = fieldVm.Label,
-                PositionXMm = fieldVm.PositionXMm,
-                PositionYMm = fieldVm.PositionYMm,
-                WidthMm = fieldVm.WidthMm,
-                HeightMm = fieldVm.HeightMm,
-                FontFamily = fieldVm.FontFamily,
-                FontSizePt = fieldVm.FontSizePt,
-                Alignment = fieldVm.Alignment,
-                IsBold = fieldVm.IsBold
-            });
+                template.Fields.Add(new TemplateField
+                {
+                    FieldType = fieldVm.FieldType,
+                    Label = fieldVm.Label,
+                    PositionXMm = fieldVm.PositionXMm,
+                    PositionYMm = fieldVm.PositionYMm,
+                    WidthMm = fieldVm.WidthMm,
+                    HeightMm = fieldVm.HeightMm,
+                    FontFamily = fieldVm.FontFamily,
+                    FontSizePt = fieldVm.FontSizePt,
+                    Alignment = fieldVm.Alignment,
+                    IsBold = fieldVm.IsBold
+                });
+            }
+
+            if (template.Id == 0)
+                await _templateService.CreateTemplateAsync(template);
+            else
+                await _templateService.UpdateTemplateAsync(template);
+
+            StatusMessage = "Template saved successfully!";
+            await LoadDataAsync();
         }
-
-        if (template.Id == 0)
-            await _templateService.CreateTemplateAsync(template);
-        else
-            await _templateService.UpdateTemplateAsync(template);
-
-        StatusMessage = "Template saved!";
-        await LoadDataAsync();
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException?.InnerException?.Message
+                        ?? ex.InnerException?.Message
+                        ?? ex.Message;
+            StatusMessage = $"Error saving template: {inner}";
+        }
     }
 
     [RelayCommand]
