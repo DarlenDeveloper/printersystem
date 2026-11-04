@@ -17,6 +17,8 @@ public partial class ChequeEntryViewModel : ObservableObject
     [ObservableProperty] private string _payee = string.Empty;
     [ObservableProperty] private decimal _amountFigures;
     [ObservableProperty] private string _amountWords = string.Empty;
+    [ObservableProperty] private string _currencyName = "Uganda Shillings";
+    [ObservableProperty] private string _fractionalUnitName = "Cents";
     [ObservableProperty] private DateTime _chequeDate = DateTime.Today;
     [ObservableProperty] private string _chequeNumber = string.Empty;
     [ObservableProperty] private string _memo = string.Empty;
@@ -30,18 +32,35 @@ public partial class ChequeEntryViewModel : ObservableObject
         _chequeService = chequeService;
         _templateService = templateService;
         _amountToWords = amountToWords;
+        UpdateAmountWords();
         _ = LoadTemplatesAsync();
     }
 
     partial void OnAmountFiguresChanged(decimal value)
     {
-        AmountWords = _amountToWords.Convert(value);
+        UpdateAmountWords();
+    }
+
+    partial void OnCurrencyNameChanged(string value) => UpdateAmountWords();
+    partial void OnFractionalUnitNameChanged(string value) => UpdateAmountWords();
+
+    private void UpdateAmountWords()
+    {
+        AmountWords = _amountToWords.Convert(AmountFigures, CurrencyName, FractionalUnitName);
     }
 
     private async Task LoadTemplatesAsync()
     {
-        var templates = await _templateService.GetAllTemplatesAsync();
-        Templates = new ObservableCollection<ChequeTemplate>(templates);
+        try
+        {
+            var templates = await _templateService.GetAllTemplatesAsync();
+            Templates = new ObservableCollection<ChequeTemplate>(templates);
+            SelectedTemplate ??= Templates.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to load templates: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -65,6 +84,19 @@ public partial class ChequeEntryViewModel : ObservableObject
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(ChequeNumber))
+        {
+            var existing = await _chequeService.GetAllEntriesAsync();
+            if (existing.Any(entry => string.Equals(
+                    entry.ChequeNumber,
+                    ChequeNumber.Trim(),
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                StatusMessage = $"Cheque number '{ChequeNumber.Trim()}' already exists.";
+                return;
+            }
+        }
+
         var entry = new ChequeEntry
         {
             TemplateId = SelectedTemplate.Id,
@@ -76,8 +108,16 @@ public partial class ChequeEntryViewModel : ObservableObject
             Memo = string.IsNullOrWhiteSpace(Memo) ? null : Memo
         };
 
-        await _chequeService.CreateEntryAsync(entry);
-        StatusMessage = $"Cheque for {Payee} added to queue.";
+        try
+        {
+            await _chequeService.CreateEntryAsync(entry);
+            StatusMessage = $"Cheque for {Payee} added to queue.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to add cheque: {ex.Message}";
+            return;
+        }
 
         // Reset form
         Payee = string.Empty;
@@ -103,8 +143,19 @@ public partial class ChequeEntryViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            var entries = await _chequeService.ImportFromCsvAsync(dialog.FileName, SelectedTemplate.Id);
-            StatusMessage = $"Imported {entries.Count} cheques from CSV.";
+            try
+            {
+                var entries = await _chequeService.ImportFromCsvAsync(
+                    dialog.FileName,
+                    SelectedTemplate.Id,
+                    CurrencyName,
+                    FractionalUnitName);
+                StatusMessage = $"Imported {entries.Count} cheques from CSV.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"CSV import failed: {ex.Message}";
+            }
         }
     }
 }

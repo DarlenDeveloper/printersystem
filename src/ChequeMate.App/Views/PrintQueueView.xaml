@@ -13,21 +13,28 @@
         <TextBlock Grid.Row="0" Text="Print Queue" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
 
         <!-- Printer selection and actions -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+        <WrapPanel Grid.Row="1" Margin="0,0,0,12">
             <TextBlock Text="Printer:" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <ComboBox ItemsSource="{Binding Printers}" SelectedItem="{Binding SelectedPrinter}" 
-                      Width="250" Margin="0,0,12,0"/>
+                      Width="220" Margin="0,0,12,0"/>
+            <TextBlock Text="Paper source:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox ItemsSource="{Binding PaperSources}" SelectedItem="{Binding SelectedPaperSource}"
+                      Width="170" Margin="0,0,12,0"/>
             <Button Content="Print Selected" Command="{Binding PrintSelectedCommand}" 
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                     IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
-            <Button Content="Print All" Command="{Binding PrintAllCommand}" 
+            <Button Content="Print Next" Command="{Binding PrintNextCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                     IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
+            <Button Content="Confirm Printed" Command="{Binding ConfirmPrintedCommand}"
+                    Background="#15803D" Foreground="White" Padding="12,6" Margin="0,0,8,0"/>
+            <Button Content="Requeue" Command="{Binding RequeueCommand}"
+                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
             <Button Content="Refresh" Command="{Binding RefreshQueueCommand}" 
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
             <Button Content="Remove" Command="{Binding RemoveFromQueueCommand}" 
                     Foreground="White" Background="#DC2626" Padding="12,6"/>
-        </StackPanel>
+        </WrapPanel>
 
         <!-- Queue list -->
         <Border Grid.Row="2" Style="{StaticResource CardBorder}">

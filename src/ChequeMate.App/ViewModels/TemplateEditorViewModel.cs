@@ -14,6 +14,7 @@ public partial class TemplateEditorViewModel : ObservableObject
 {
     private readonly ITemplateService _templateService;
     private readonly IBankProfileService _bankService;
+    private readonly IPrintService _printService;
 
     [ObservableProperty] private ObservableCollection<ChequeTemplate> _templates = new();
     [ObservableProperty] private ObservableCollection<BankProfile> _banks = new();
@@ -25,9 +26,32 @@ public partial class TemplateEditorViewModel : ObservableObject
     [ObservableProperty] private double _offsetXMm;
     [ObservableProperty] private double _offsetYMm;
     [ObservableProperty] private int? _selectedBankId;
+    [ObservableProperty] private string _newBankName = string.Empty;
     [ObservableProperty] private ObservableCollection<TemplateFieldViewModel> _fields = new();
     [ObservableProperty] private TemplateFieldViewModel? _selectedField;
+    [ObservableProperty] private ObservableCollection<string> _printers = new();
+    [ObservableProperty] private string? _selectedPrinter;
+    [ObservableProperty] private ObservableCollection<string> _paperSources = new();
+    [ObservableProperty] private string? _selectedPaperSource;
     [ObservableProperty] private string _statusMessage = string.Empty;
+    [ObservableProperty] private bool _isBusy;
+
+    public Func<FieldType?>? RequestFieldType { get; set; }
+    public Func<string, bool>? ConfirmAction { get; set; }
+
+    public TemplateEditorViewModel(
+        ITemplateService templateService,
+        IBankProfileService bankService,
+        IPrintService printService)
+    {
+        _templateService = templateService;
+        _bankService = bankService;
+        _printService = printService;
+
+        Printers = new ObservableCollection<string>(_printService.GetAvailablePrinters());
+        SelectedPrinter = Printers.FirstOrDefault();
+        _ = LoadDataAsync();
+    }
 
     partial void OnSelectedFieldChanged(TemplateFieldViewModel? oldValue, TemplateFieldViewModel? newValue)
     {
@@ -35,20 +59,35 @@ public partial class TemplateEditorViewModel : ObservableObject
         if (newValue != null) newValue.IsSelected = true;
     }
 
-    public TemplateEditorViewModel(ITemplateService templateService, IBankProfileService bankService)
+    partial void OnSelectedPrinterChanged(string? value)
     {
-        _templateService = templateService;
-        _bankService = bankService;
-        _ = LoadDataAsync();
+        var sources = string.IsNullOrWhiteSpace(value)
+            ? new List<string>()
+            : _printService.GetAvailablePaperSources(value);
+        PaperSources = new ObservableCollection<string>(sources);
+        SelectedPaperSource = FindPreferredPaperSource(sources);
     }
 
-    private async Task LoadDataAsync()
+    private async Task LoadDataAsync(int? selectTemplateId = null)
     {
-        var templates = await _templateService.GetAllTemplatesAsync();
-        Templates = new ObservableCollection<ChequeTemplate>(templates);
+        try
+        {
+            var templates = await _templateService.GetAllTemplatesAsync();
+            Templates = new ObservableCollection<ChequeTemplate>(templates);
 
-        var banks = await _bankService.GetAllAsync();
-        Banks = new ObservableCollection<BankProfile>(banks);
+            var banks = await _bankService.GetAllAsync();
+            Banks = new ObservableCollection<BankProfile>(banks);
+
+            if (selectTemplateId.HasValue)
+            {
+                SelectedTemplate = Templates.FirstOrDefault(t => t.Id == selectTemplateId.Value);
+                LoadTemplate();
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to load template data: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -60,42 +99,59 @@ public partial class TemplateEditorViewModel : ObservableObject
             Title = "Select scanned cheque image"
         };
 
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var bitmap = LoadBitmap(dialog.FileName);
+        ChequeImage = bitmap;
+
+        if (bitmap.DpiX > 0 && bitmap.DpiY > 0)
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.UriSource = new Uri(dialog.FileName);
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.EndInit();
-            bitmap.Freeze();
-
-            ChequeImage = bitmap;
-
-            // Try to extract DPI info for calibration
-            if (bitmap.DpiX > 0 && bitmap.DpiY > 0)
-            {
-                // Auto-calculate paper dimensions from image size and DPI
-                double imageWidthInches = bitmap.PixelWidth / bitmap.DpiX;
-                double imageHeightInches = bitmap.PixelHeight / bitmap.DpiY;
-                PaperWidthMm = Math.Round(imageWidthInches * 25.4, 1);
-                PaperHeightMm = Math.Round(imageHeightInches * 25.4, 1);
-            }
-
-            StatusMessage = $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {bitmap.DpiX} DPI";
+            PaperWidthMm = Math.Round(bitmap.PixelWidth / bitmap.DpiX * 25.4, 1);
+            PaperHeightMm = Math.Round(bitmap.PixelHeight / bitmap.DpiY * 25.4, 1);
         }
+
+        StatusMessage = $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {bitmap.DpiX:0.#} DPI";
     }
 
-    /// <summary>
-    /// Set by the View so the ViewModel can request a field type from the user
-    /// without taking a hard dependency on WPF Window classes.
-    /// </summary>
-    public Func<FieldType?>? RequestFieldType { get; set; }
+    [RelayCommand]
+    private async Task AddBank()
+    {
+        var name = NewBankName.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            StatusMessage = "Enter a bank name first.";
+            return;
+        }
+
+        var existing = Banks.FirstOrDefault(b =>
+            string.Equals(b.BankName, name, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            SelectedBankId = existing.Id;
+            StatusMessage = "That bank already exists and has been selected.";
+            return;
+        }
+
+        try
+        {
+            var bank = await _bankService.CreateAsync(new BankProfile { BankName = name });
+            NewBankName = string.Empty;
+            await LoadDataAsync();
+            SelectedBankId = bank.Id;
+            StatusMessage = $"Bank '{bank.BankName}' added.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to add bank: {ex.Message}";
+        }
+    }
 
     [RelayCommand]
     private void AddField()
     {
         var fieldType = RequestFieldType?.Invoke();
-        if (fieldType == null) return; // user cancelled
+        if (fieldType == null) return;
 
         var field = new TemplateFieldViewModel
         {
@@ -112,84 +168,28 @@ public partial class TemplateEditorViewModel : ObservableObject
         SelectedField = field;
     }
 
-    private static double DefaultWidthForField(FieldType type) => type switch
-    {
-        FieldType.AmountInWords => 120,
-        FieldType.AmountInFigures => 50,
-        FieldType.Date => 40,
-        FieldType.ChequeNumber => 40,
-        FieldType.AccountPayee => 60,
-        _ => 80
-    };
-
     [RelayCommand]
     private void RemoveField()
     {
-        if (SelectedField != null)
-        {
-            Fields.Remove(SelectedField);
-            SelectedField = null;
-        }
+        if (SelectedField == null) return;
+        Fields.Remove(SelectedField);
+        SelectedField = null;
     }
 
     [RelayCommand]
-    private async Task SaveTemplate()
+    private void NewTemplate()
     {
-        if (string.IsNullOrWhiteSpace(TemplateName))
-        {
-            StatusMessage = "Please enter a template name.";
-            return;
-        }
-
-        try
-        {
-            var template = SelectedTemplate ?? new ChequeTemplate();
-            template.TemplateName = TemplateName;
-            template.BankProfileId = SelectedBankId;
-            template.PaperWidthMm = PaperWidthMm;
-            template.PaperHeightMm = PaperHeightMm;
-            template.OffsetXMm = OffsetXMm;
-            template.OffsetYMm = OffsetYMm;
-
-            // Safely resolve the image path whether it came from a Uri or a local file dialog
-            if (ChequeImage?.UriSource != null)
-                template.ChequeImagePath = ChequeImage.UriSource.IsFile
-                    ? ChequeImage.UriSource.LocalPath
-                    : ChequeImage.UriSource.AbsolutePath;
-
-            template.Fields.Clear();
-            foreach (var fieldVm in Fields)
-            {
-                template.Fields.Add(new TemplateField
-                {
-                    FieldType = fieldVm.FieldType,
-                    Label = fieldVm.Label,
-                    PositionXMm = fieldVm.PositionXMm,
-                    PositionYMm = fieldVm.PositionYMm,
-                    WidthMm = fieldVm.WidthMm,
-                    HeightMm = fieldVm.HeightMm,
-                    FontFamily = fieldVm.FontFamily,
-                    FontSizePt = fieldVm.FontSizePt,
-                    Alignment = fieldVm.Alignment,
-                    IsBold = fieldVm.IsBold
-                });
-            }
-
-            if (template.Id == 0)
-                await _templateService.CreateTemplateAsync(template);
-            else
-                await _templateService.UpdateTemplateAsync(template);
-
-            StatusMessage = "Template saved successfully!";
-            await LoadDataAsync();
-        }
-        catch (Exception ex)
-        {
-            var inner = ex.InnerException?.InnerException?.Message
-                        ?? ex.InnerException?.Message
-                        ?? ex.Message;
-            StatusMessage = $"Error saving template: {inner}";
-        }
+        SelectedTemplate = null;
+        TemplateName = string.Empty;
+        PaperWidthMm = 170;
+        PaperHeightMm = 70;
+        OffsetXMm = 0;
+        OffsetYMm = 0;
+        SelectedBankId = null;
+        ChequeImage = null;
+        Fields.Clear();
+        SelectedField = null;
+        StatusMessage = "New template started.";
     }
 
     [RelayCommand]
@@ -203,22 +203,134 @@ public partial class TemplateEditorViewModel : ObservableObject
         OffsetXMm = SelectedTemplate.OffsetXMm;
         OffsetYMm = SelectedTemplate.OffsetYMm;
         SelectedBankId = SelectedTemplate.BankProfileId;
+        ChequeImage = !string.IsNullOrEmpty(SelectedTemplate.ChequeImagePath) &&
+                      File.Exists(SelectedTemplate.ChequeImagePath)
+            ? LoadBitmap(SelectedTemplate.ChequeImagePath)
+            : null;
 
-        if (!string.IsNullOrEmpty(SelectedTemplate.ChequeImagePath) && File.Exists(SelectedTemplate.ChequeImagePath))
+        Fields = new ObservableCollection<TemplateFieldViewModel>(
+            SelectedTemplate.Fields.Select(ToFieldViewModel));
+        SelectedField = null;
+        StatusMessage = $"Loaded template: {TemplateName}";
+    }
+
+    [RelayCommand]
+    private async Task SaveTemplate()
+    {
+        var validationError = ValidateEditor();
+        if (validationError != null)
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.UriSource = new Uri(SelectedTemplate.ChequeImagePath);
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.EndInit();
-            bitmap.Freeze();
-            ChequeImage = bitmap;
+            StatusMessage = validationError;
+            return;
         }
 
-        Fields.Clear();
-        foreach (var field in SelectedTemplate.Fields)
+        try
         {
-            Fields.Add(new TemplateFieldViewModel
+            IsBusy = true;
+            var template = BuildTemplateSnapshot();
+            if (template.Id == 0)
+                await _templateService.CreateTemplateAsync(template);
+            else
+                await _templateService.UpdateTemplateAsync(template);
+
+            await LoadDataAsync(template.Id);
+            StatusMessage = "Template saved successfully.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error saving template: {GetInnermostMessage(ex)}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteTemplate()
+    {
+        if (SelectedTemplate == null)
+        {
+            StatusMessage = "Select a saved template to delete.";
+            return;
+        }
+
+        if (ConfirmAction?.Invoke(
+                $"Delete template '{SelectedTemplate.TemplateName}'? This cannot be undone.") != true)
+            return;
+
+        try
+        {
+            await _templateService.DeleteTemplateAsync(SelectedTemplate.Id);
+            NewTemplate();
+            await LoadDataAsync();
+            StatusMessage = "Template deleted.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Template could not be deleted: {GetInnermostMessage(ex)}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task PrintAlignmentTest()
+    {
+        var validationError = ValidateEditor();
+        if (validationError != null)
+        {
+            StatusMessage = validationError;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedPrinter) || string.IsNullOrWhiteSpace(SelectedPaperSource))
+        {
+            StatusMessage = "Select a printer and its rear/manual paper source.";
+            return;
+        }
+
+        var prompt =
+            $"Load one plain sheet cut to {PaperWidthMm:0.#} x {PaperHeightMm:0.#} mm into " +
+            $"'{SelectedPaperSource}' on '{SelectedPrinter}'. Print the alignment grid now?";
+        if (ConfirmAction?.Invoke(prompt) != true)
+            return;
+
+        try
+        {
+            IsBusy = true;
+            await _printService.PrintAlignmentTestAsync(
+                BuildTemplateSnapshot(),
+                SelectedPrinter,
+                SelectedPaperSource);
+            StatusMessage = "Alignment job submitted. Compare the output with the cheque before continuing.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Alignment print failed: {GetInnermostMessage(ex)}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private ChequeTemplate BuildTemplateSnapshot()
+    {
+        var template = new ChequeTemplate
+        {
+            Id = SelectedTemplate?.Id ?? 0,
+            TemplateName = TemplateName.Trim(),
+            BankProfileId = SelectedBankId,
+            ChequeImagePath = ChequeImage?.UriSource is { IsFile: true } uri ? uri.LocalPath : null,
+            PaperWidthMm = PaperWidthMm,
+            PaperHeightMm = PaperHeightMm,
+            OffsetXMm = OffsetXMm,
+            OffsetYMm = OffsetYMm,
+            CreatedAt = SelectedTemplate?.CreatedAt ?? DateTime.UtcNow
+        };
+
+        foreach (var field in Fields)
+        {
+            template.Fields.Add(new TemplateField
             {
                 FieldType = field.FieldType,
                 Label = field.Label,
@@ -233,13 +345,80 @@ public partial class TemplateEditorViewModel : ObservableObject
             });
         }
 
-        StatusMessage = $"Loaded template: {TemplateName}";
+        return template;
+    }
+
+    private string? ValidateEditor()
+    {
+        if (string.IsNullOrWhiteSpace(TemplateName))
+            return "Please enter a template name.";
+        if (!SelectedBankId.HasValue)
+            return "Please add or select a bank.";
+        if (!double.IsFinite(PaperWidthMm) || !double.IsFinite(PaperHeightMm) ||
+            PaperWidthMm <= 0 || PaperHeightMm <= 0)
+            return "Paper width and height must be positive numbers.";
+        if (Fields.Count == 0)
+            return "Add at least one printable field.";
+
+        var invalidField = Fields.FirstOrDefault(field =>
+            field.PositionXMm < 0 || field.PositionYMm < 0 ||
+            field.WidthMm <= 0 || field.HeightMm <= 0 ||
+            field.PositionXMm + field.WidthMm > PaperWidthMm ||
+            field.PositionYMm + field.HeightMm > PaperHeightMm);
+        return invalidField == null
+            ? null
+            : $"Field '{invalidField.DisplayName}' lies outside the cheque boundaries.";
+    }
+
+    private static BitmapImage LoadBitmap(string path)
+    {
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.UriSource = new Uri(path);
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private static TemplateFieldViewModel ToFieldViewModel(TemplateField field) => new()
+    {
+        FieldType = field.FieldType,
+        Label = field.Label,
+        PositionXMm = field.PositionXMm,
+        PositionYMm = field.PositionYMm,
+        WidthMm = field.WidthMm,
+        HeightMm = field.HeightMm,
+        FontFamily = field.FontFamily,
+        FontSizePt = field.FontSizePt,
+        Alignment = field.Alignment,
+        IsBold = field.IsBold
+    };
+
+    private static double DefaultWidthForField(FieldType type) => type switch
+    {
+        FieldType.AmountInWords => 120,
+        FieldType.AmountInFigures => 50,
+        FieldType.Date => 40,
+        FieldType.ChequeNumber => 40,
+        FieldType.AccountPayee => 60,
+        _ => 80
+    };
+
+    private static string? FindPreferredPaperSource(IEnumerable<string> sources) =>
+        sources.FirstOrDefault(source =>
+            source.Contains("rear", StringComparison.OrdinalIgnoreCase) ||
+            source.Contains("manual", StringComparison.OrdinalIgnoreCase) ||
+            source.Contains("bypass", StringComparison.OrdinalIgnoreCase));
+
+    private static string GetInnermostMessage(Exception exception)
+    {
+        while (exception.InnerException != null)
+            exception = exception.InnerException;
+        return exception.Message;
     }
 }
 
-/// <summary>
-/// ViewModel for a single draggable field on the template canvas.
-/// </summary>
 public partial class TemplateFieldViewModel : ObservableObject
 {
     [ObservableProperty] private FieldType _fieldType;

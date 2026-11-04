@@ -17,87 +17,91 @@ public class AmountToWordsService : IAmountToWordsService
         "Sixty", "Seventy", "Eighty", "Ninety"
     };
 
-    public string Convert(decimal amount, string currency = "")
+    private static readonly (long Value, string Name)[] Scales =
     {
-        if (amount < 0)
-            return "Negative " + Convert(-amount, currency);
+        (1_000_000_000_000_000_000, "Quintillion"),
+        (1_000_000_000_000_000, "Quadrillion"),
+        (1_000_000_000_000, "Trillion"),
+        (1_000_000_000, "Billion"),
+        (1_000_000, "Million"),
+        (1_000, "Thousand")
+    };
 
-        if (amount == 0)
-            return "Zero Only";
+    public string Convert(decimal amount, string currency = "", string fractionalUnit = "Cents")
+    {
+        var isNegative = amount < 0;
+        var rounded = decimal.Round(decimal.Abs(amount), 2, MidpointRounding.AwayFromZero);
 
-        var wholePart = (long)Math.Floor(amount);
-        var fractionalPart = (int)Math.Round((amount - wholePart) * 100);
+        if (rounded > long.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Amount is too large to convert to words.");
 
-        var result = string.Empty;
+        var wholePart = (long)decimal.Truncate(rounded);
+        var fractionalPart = (int)((rounded - wholePart) * 100);
+        var wholeWords = ConvertWholeNumber(wholePart);
 
-        if (wholePart > 0)
-        {
-            result = ConvertWholeNumber(wholePart);
-        }
+        var result = string.IsNullOrWhiteSpace(currency)
+            ? wholeWords
+            : $"{currency.Trim()} {wholeWords}";
 
         if (fractionalPart > 0)
         {
-            if (wholePart > 0)
-                result += " and ";
-            result += ConvertWholeNumber(fractionalPart) + " Cents";
+            var unit = fractionalPart == 1
+                ? Singularize(fractionalUnit)
+                : fractionalUnit.Trim();
+            result += $" and {ConvertWholeNumber(fractionalPart)} {unit}";
         }
 
         result += " Only";
-
-        if (!string.IsNullOrWhiteSpace(currency))
-            result = currency + " " + result;
-
-        return result.Trim();
+        return isNegative ? $"Negative {result}" : result;
     }
 
     private static string ConvertWholeNumber(long number)
     {
-        if (number == 0) return string.Empty;
-        if (number < 0) return "Negative " + ConvertWholeNumber(-number);
+        if (number == 0)
+            return "Zero";
 
-        var words = string.Empty;
-
-        if (number / 10_000_000 > 0)
+        foreach (var scale in Scales)
         {
-            words += ConvertWholeNumber(number / 10_000_000) + " Crore ";
-            number %= 10_000_000;
+            if (number < scale.Value)
+                continue;
+
+            var leading = ConvertWholeNumber(number / scale.Value);
+            var remainder = number % scale.Value;
+            if (remainder == 0)
+                return $"{leading} {scale.Name}";
+
+            var separator = remainder < 100 ? " and " : " ";
+            return $"{leading} {scale.Name}{separator}{ConvertWholeNumber(remainder)}";
         }
 
-        if (number / 100_000 > 0)
+        return ConvertBelowOneThousand((int)number);
+    }
+
+    private static string ConvertBelowOneThousand(int number)
+    {
+        if (number < 20)
+            return Ones[number];
+
+        if (number < 100)
         {
-            words += ConvertWholeNumber(number / 100_000) + " Lakh ";
-            number %= 100_000;
+            var remainder = number % 10;
+            return remainder == 0
+                ? Tens[number / 10]
+                : $"{Tens[number / 10]} {Ones[remainder]}";
         }
 
-        if (number / 1_000 > 0)
-        {
-            words += ConvertWholeNumber(number / 1_000) + " Thousand ";
-            number %= 1_000;
-        }
+        var hundreds = $"{Ones[number / 100]} Hundred";
+        var rest = number % 100;
+        return rest == 0
+            ? hundreds
+            : $"{hundreds} and {ConvertBelowOneThousand(rest)}";
+    }
 
-        if (number / 100 > 0)
-        {
-            words += ConvertWholeNumber(number / 100) + " Hundred ";
-            number %= 100;
-        }
-
-        if (number > 0)
-        {
-            if (!string.IsNullOrEmpty(words))
-                words += "and ";
-
-            if (number < 20)
-            {
-                words += Ones[number];
-            }
-            else
-            {
-                words += Tens[number / 10];
-                if (number % 10 > 0)
-                    words += " " + Ones[number % 10];
-            }
-        }
-
-        return words.Trim();
+    private static string Singularize(string value)
+    {
+        var trimmed = value.Trim();
+        return trimmed.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+            ? trimmed[..^1]
+            : trimmed;
     }
 }

@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Drawing.Printing;
 using ChequeMate.Core.Enums;
 using ChequeMate.Core.Models;
@@ -18,97 +19,99 @@ public class PrintService : IPrintService
         _engine = engine;
     }
 
-    public async Task<PrintHistory> PrintChequeAsync(ChequeEntry entry, string? printerName = null)
+    public async Task<PrintHistory> PrintChequeAsync(
+        ChequeEntry entry,
+        string printerName,
+        string paperSourceName)
     {
-        var template = entry.Template;
-        if (template == null)
-            throw new InvalidOperationException("Cheque entry must have a loaded template.");
+        var template = entry.Template
+            ?? throw new InvalidOperationException("Cheque entry must have a loaded template.");
+
+        if (entry.PrintStatus is PrintStatus.Printing or PrintStatus.Submitted or PrintStatus.Printed)
+            throw new InvalidOperationException($"Cheque cannot be submitted while its status is {entry.PrintStatus}.");
+
+        var persistedEntry = await _db.ChequeEntries.FindAsync(entry.Id)
+            ?? throw new InvalidOperationException("The cheque entry no longer exists in the database.");
 
         var history = new PrintHistory
         {
             ChequeEntryId = entry.Id,
-            PrinterName = printerName
+            PrinterName = printerName,
+            PrintedAt = DateTime.UtcNow
         };
 
         try
         {
+            ValidateTemplate(template);
+            ValidateKnownPrinterMedia(printerName, template);
             entry.PrintStatus = PrintStatus.Printing;
+            persistedEntry.PrintStatus = PrintStatus.Printing;
+            await _db.SaveChangesAsync();
 
-            var printDoc = new PrintDocument();
-            if (!string.IsNullOrEmpty(printerName))
-                printDoc.PrinterSettings.PrinterName = printerName;
+            using var printDocument = CreatePrintDocument(
+                template,
+                printerName,
+                paperSourceName);
 
-            // Set custom paper size matching the cheque dimensions
-            var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
-                printDoc.PrinterSettings, template.PaperWidthMm, template.PaperHeightMm);
-            printDoc.DefaultPageSettings.PaperSize = paperSize;
-            printDoc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
-
-            // Cheques are landscape if wider than tall
-            printDoc.DefaultPageSettings.Landscape =
-                template.PaperWidthMm > template.PaperHeightMm;
-
-            printDoc.PrintPage += (sender, e) =>
+            printDocument.DocumentName = BuildDocumentName(entry);
+            printDocument.PrintPage += (_, e) =>
             {
                 if (e.Graphics != null)
+                {
+                    ConfigurePhysicalPageCoordinates(e);
                     _engine.RenderCheque(e.Graphics, entry, template);
+                }
+
                 e.HasMorePages = false;
             };
 
-            await Task.Run(() => printDoc.Print());
+            // Print() returning means Windows accepted the job. It does not prove that
+            // ink reached the cheque, so an operator must confirm it separately.
+            await Task.Run(printDocument.Print);
 
-            entry.PrintStatus = PrintStatus.Printed;
-            entry.PrintedAt = DateTime.UtcNow;
+            entry.PrintStatus = PrintStatus.Submitted;
             history.Success = true;
-            history.PrintedAt = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
             entry.PrintStatus = PrintStatus.Failed;
             history.Success = false;
             history.ErrorMessage = ex.Message;
-            history.PrintedAt = DateTime.UtcNow;
         }
 
         _db.PrintHistories.Add(history);
-        _db.ChequeEntries.Update(entry);
+        persistedEntry.PrintStatus = entry.PrintStatus;
+        persistedEntry.PrintedAt = entry.PrintedAt;
         await _db.SaveChangesAsync();
-
         return history;
     }
 
-    public async Task<List<PrintHistory>> PrintBatchAsync(List<ChequeEntry> entries, string? printerName = null)
+    public async Task PrintAlignmentTestAsync(
+        ChequeTemplate template,
+        string printerName,
+        string paperSourceName)
     {
-        var results = new List<PrintHistory>();
-        foreach (var entry in entries)
-        {
-            var result = await PrintChequeAsync(entry, printerName);
-            results.Add(result);
-        }
-        return results;
-    }
+        ValidateTemplate(template);
+        ValidateKnownPrinterMedia(printerName, template);
 
-    public async Task PrintAlignmentTestAsync(ChequeTemplate template, string? printerName = null)
-    {
-        var printDoc = new PrintDocument();
-        if (!string.IsNullOrEmpty(printerName))
-            printDoc.PrinterSettings.PrinterName = printerName;
+        using var printDocument = CreatePrintDocument(
+            template,
+            printerName,
+            paperSourceName);
 
-        var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
-            printDoc.PrinterSettings, template.PaperWidthMm, template.PaperHeightMm);
-        printDoc.DefaultPageSettings.PaperSize = paperSize;
-        printDoc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
-        printDoc.DefaultPageSettings.Landscape =
-            template.PaperWidthMm > template.PaperHeightMm;
-
-        printDoc.PrintPage += (sender, e) =>
+        printDocument.DocumentName = $"ChequeMate alignment - {template.TemplateName}";
+        printDocument.PrintPage += (_, e) =>
         {
             if (e.Graphics != null)
+            {
+                ConfigurePhysicalPageCoordinates(e);
                 _engine.RenderAlignmentTest(e.Graphics, template);
+            }
+
             e.HasMorePages = false;
         };
 
-        await Task.Run(() => printDoc.Print());
+        await Task.Run(printDocument.Print);
     }
 
     public List<string> GetAvailablePrinters()
@@ -117,5 +120,140 @@ public class PrintService : IPrintService
         foreach (string printer in PrinterSettings.InstalledPrinters)
             printers.Add(printer);
         return printers;
+    }
+
+    public List<string> GetAvailablePaperSources(string printerName)
+    {
+        if (string.IsNullOrWhiteSpace(printerName))
+            return new List<string>();
+
+        var settings = new PrinterSettings { PrinterName = printerName };
+        if (!settings.IsValid)
+            return new List<string>();
+
+        var sources = new List<string>();
+        foreach (PaperSource source in settings.PaperSources)
+        {
+            if (!string.IsNullOrWhiteSpace(source.SourceName))
+                sources.Add(source.SourceName);
+        }
+
+        return sources.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static PrintDocument CreatePrintDocument(
+        ChequeTemplate template,
+        string printerName,
+        string paperSourceName)
+    {
+        if (string.IsNullOrWhiteSpace(printerName))
+            throw new InvalidOperationException("Select a printer before printing.");
+        if (string.IsNullOrWhiteSpace(paperSourceName))
+            throw new InvalidOperationException("Select the rear/manual paper source before printing.");
+
+        var document = new PrintDocument
+        {
+            OriginAtMargins = false,
+            PrintController = new StandardPrintController()
+        };
+
+        document.PrinterSettings.PrinterName = printerName;
+        if (!document.PrinterSettings.IsValid)
+        {
+            document.Dispose();
+            throw new InvalidOperationException($"Printer '{printerName}' is not available.");
+        }
+
+        var source = document.PrinterSettings.PaperSources
+            .Cast<PaperSource>()
+            .FirstOrDefault(item => string.Equals(
+                item.SourceName,
+                paperSourceName,
+                StringComparison.OrdinalIgnoreCase));
+
+        if (source == null)
+        {
+            document.Dispose();
+            throw new InvalidOperationException(
+                $"Paper source '{paperSourceName}' is no longer available on '{printerName}'.");
+        }
+
+        var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
+            document.PrinterSettings,
+            template.PaperWidthMm,
+            template.PaperHeightMm,
+            out var landscape);
+
+        document.DefaultPageSettings.PaperSource = source;
+        document.DefaultPageSettings.PaperSize = paperSize;
+        document.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
+        document.DefaultPageSettings.Landscape = landscape;
+        return document;
+    }
+
+    private static void ConfigurePhysicalPageCoordinates(PrintPageEventArgs e)
+    {
+        if (e.Graphics == null)
+            return;
+
+        e.Graphics.PageUnit = GraphicsUnit.Millimeter;
+
+        // With OriginAtMargins=false, GDI starts at the printable area's top-left.
+        // Move the origin back to the physical paper edge so template coordinates
+        // remain measured from the cheque's top-left on every printer.
+        var hardMarginXMm = e.PageSettings.HardMarginX * 25.4f / 100f;
+        var hardMarginYMm = e.PageSettings.HardMarginY * 25.4f / 100f;
+        e.Graphics.TranslateTransform(-hardMarginXMm, -hardMarginYMm);
+    }
+
+    private static void ValidateTemplate(ChequeTemplate template)
+    {
+        if (!double.IsFinite(template.PaperWidthMm) ||
+            !double.IsFinite(template.PaperHeightMm) ||
+            template.PaperWidthMm <= 0 ||
+            template.PaperHeightMm <= 0)
+        {
+            throw new InvalidOperationException("Cheque paper dimensions must be positive numbers.");
+        }
+
+        if (template.Fields.Count == 0)
+            throw new InvalidOperationException("The template has no printable fields.");
+
+        foreach (var field in template.Fields)
+        {
+            if (field.PositionXMm < 0 || field.PositionYMm < 0 ||
+                field.WidthMm <= 0 || field.HeightMm <= 0 ||
+                field.PositionXMm + field.WidthMm > template.PaperWidthMm ||
+                field.PositionYMm + field.HeightMm > template.PaperHeightMm)
+            {
+                throw new InvalidOperationException(
+                    $"Field '{field.Label ?? field.FieldType.ToString()}' lies outside the cheque boundaries.");
+            }
+        }
+    }
+
+    private static void ValidateKnownPrinterMedia(string printerName, ChequeTemplate template)
+    {
+        var isCanonGx7000 = printerName.Contains("GX70", StringComparison.OrdinalIgnoreCase) ||
+                            printerName.Contains("GX7000", StringComparison.OrdinalIgnoreCase);
+        if (!isCanonGx7000)
+            return;
+
+        var shortEdge = Math.Min(template.PaperWidthMm, template.PaperHeightMm);
+        var longEdge = Math.Max(template.PaperWidthMm, template.PaperHeightMm);
+        if (shortEdge < 89 || shortEdge > 216 || longEdge < 127 || longEdge > 1200)
+        {
+            throw new InvalidOperationException(
+                "Canon MAXIFY GX7000-series custom media must be 89-216 mm wide and 127-1200 mm long. " +
+                $"This template is {template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm.");
+        }
+    }
+
+    private static string BuildDocumentName(ChequeEntry entry)
+    {
+        var identifier = string.IsNullOrWhiteSpace(entry.ChequeNumber)
+            ? entry.Id.ToString()
+            : entry.ChequeNumber;
+        return $"ChequeMate cheque {identifier}";
     }
 }

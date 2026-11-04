@@ -20,6 +20,12 @@
                     <x:Type TypeName="enums:FieldType"/>
                 </ObjectDataProvider.MethodParameters>
             </ObjectDataProvider>
+            <ObjectDataProvider x:Key="TextAlignmentValues" MethodName="GetValues"
+                                ObjectType="{x:Type sys:Enum}">
+                <ObjectDataProvider.MethodParameters>
+                    <x:Type TypeName="enums:TextAlignment"/>
+                </ObjectDataProvider.MethodParameters>
+            </ObjectDataProvider>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

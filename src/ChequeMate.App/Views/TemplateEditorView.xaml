@@ -15,15 +15,38 @@
         </Grid.ColumnDefinitions>
 
         <!-- Top toolbar -->
-        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,12">
-            <TextBlock Text="Template Editor" FontSize="18" FontWeight="SemiBold" 
-                       VerticalAlignment="Center" Margin="0,0,16,0"/>
-            <Button Content="Import Cheque Image" Command="{Binding ImportChequeImageCommand}" 
-                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
-            <Button Content="+ Add Field" Command="{Binding AddFieldCommand}" 
-                    Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
-            <Button Content="Save Template" Command="{Binding SaveTemplateCommand}" 
-                    Style="{StaticResource PrimaryButton}"/>
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+            <WrapPanel Margin="0,0,0,8">
+                <TextBlock Text="Template Editor" FontSize="18" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
+                          DisplayMemberPath="TemplateName" Width="180" Margin="0,0,8,0"
+                          ToolTip="Saved templates"/>
+                <Button Content="Load" Command="{Binding LoadTemplateCommand}"
+                        Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                <Button Content="New" Command="{Binding NewTemplateCommand}"
+                        Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                <Button Content="Delete" Command="{Binding DeleteTemplateCommand}"
+                        Background="#DC2626" Foreground="White" Padding="12,6" Margin="0,0,8,0"/>
+                <Button Content="Import Image" Command="{Binding ImportChequeImageCommand}"
+                        Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                <Button Content="+ Add Field" Command="{Binding AddFieldCommand}"
+                        Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                <Button Content="Save" Command="{Binding SaveTemplateCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+            </WrapPanel>
+            <WrapPanel>
+                <TextBlock Text="Calibration printer:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox ItemsSource="{Binding Printers}" SelectedItem="{Binding SelectedPrinter}"
+                          Width="220" Margin="0,0,8,0"/>
+                <TextBlock Text="Paper source:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox ItemsSource="{Binding PaperSources}" SelectedItem="{Binding SelectedPaperSource}"
+                          Width="180" Margin="0,0,8,0"/>
+                <Button Content="Print Alignment Test" Command="{Binding PrintAlignmentTestCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+            </WrapPanel>
         </StackPanel>
 
         <!-- Canvas area (cheque image + draggable fields) -->
@@ -101,6 +124,16 @@
                     <TextBlock Text="Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                     <TextBox Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
 
+                    <TextBlock Text="Bank" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <ComboBox ItemsSource="{Binding Banks}" SelectedValue="{Binding SelectedBankId}"
+                              SelectedValuePath="Id" DisplayMemberPath="BankName" Margin="0,2,0,8"/>
+                    <TextBlock Text="Add a bank" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <DockPanel Margin="0,2,0,8">
+                        <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddBankCommand}"
+                                Style="{StaticResource PrimaryButton}" Margin="6,0,0,0"/>
+                        <TextBox Text="{Binding NewBankName, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DockPanel>
+
                     <TextBlock Text="Paper Width (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                     <TextBox Text="{Binding PaperWidthMm, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}" Margin="0,2,0,8"/>
 
@@ -141,6 +174,10 @@
 
                     <TextBlock Text="Font Size (pt)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                     <TextBox Text="{Binding SelectedField.FontSizePt, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8"/>
+
+                    <TextBlock Text="Alignment" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <ComboBox ItemsSource="{Binding Source={StaticResource TextAlignmentValues}}"
+                              SelectedItem="{Binding SelectedField.Alignment}" Margin="0,2,0,8"/>
 
                     <CheckBox Content="Bold" IsChecked="{Binding SelectedField.IsBold}" Margin="0,0,0,8"/>
 

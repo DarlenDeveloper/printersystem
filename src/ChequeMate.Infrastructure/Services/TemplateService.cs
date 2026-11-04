@@ -17,6 +17,7 @@ public class TemplateService : ITemplateService
     public async Task<List<ChequeTemplate>> GetAllTemplatesAsync()
     {
         return await _db.ChequeTemplates
+            .AsNoTracking()
             .Include(t => t.BankProfile)
             .Include(t => t.Fields)
             .OrderBy(t => t.TemplateName)
@@ -26,6 +27,7 @@ public class TemplateService : ITemplateService
     public async Task<ChequeTemplate?> GetTemplateByIdAsync(int id)
     {
         return await _db.ChequeTemplates
+            .AsNoTracking()
             .Include(t => t.BankProfile)
             .Include(t => t.Fields)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -34,6 +36,7 @@ public class TemplateService : ITemplateService
     public async Task<List<ChequeTemplate>> GetTemplatesByBankAsync(int bankProfileId)
     {
         return await _db.ChequeTemplates
+            .AsNoTracking()
             .Include(t => t.Fields)
             .Where(t => t.BankProfileId == bankProfileId)
             .ToListAsync();

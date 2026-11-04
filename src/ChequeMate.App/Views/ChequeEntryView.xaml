@@ -20,6 +20,22 @@
                 <TextBlock Text="Payee Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <TextBox Text="{Binding Payee, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
 
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Currency wording" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBox Text="{Binding CurrencyName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Fractional unit" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBox Text="{Binding FractionalUnitName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+
                 <TextBlock Text="Amount" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <TextBox Text="{Binding AmountFigures, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,4"/>
                 <TextBlock Text="{Binding AmountWords}" FontStyle="Italic" 

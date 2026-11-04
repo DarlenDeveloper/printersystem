@@ -39,6 +39,7 @@ public partial class TemplateEditorView : UserControl
         if (e.NewValue is TemplateEditorViewModel vm)
         {
             vm.RequestFieldType = ShowFieldPicker;
+            vm.ConfirmAction = ConfirmAction;
         }
     }
 
@@ -53,6 +54,14 @@ public partial class TemplateEditorView : UserControl
         };
         return dialog.ShowDialog() == true ? dialog.SelectedFieldType : null;
     }
+
+    private bool ConfirmAction(string message) =>
+        MessageBox.Show(
+            Window.GetWindow(this),
+            message,
+            "ChequeMate",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
     private TemplateEditorViewModel? Vm => DataContext as TemplateEditorViewModel;
 

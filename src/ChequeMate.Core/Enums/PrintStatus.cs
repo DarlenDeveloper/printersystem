@@ -4,6 +4,7 @@ public enum PrintStatus
 {
     Pending,
     Printing,
+    Submitted,
     Printed,
     Failed
 }

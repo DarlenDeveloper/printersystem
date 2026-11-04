@@ -4,7 +4,7 @@
 
 - Windows 10/11
 - .NET 8 SDK installed ([download](https://dotnet.microsoft.com/download/dotnet/8.0))
-- HP LaserJet (or any printer) connected and configured
+- A Windows-compatible printer connected with its manufacturer's full driver
 - A scanner or phone camera to scan your blank cheque leaves
 
 ---
@@ -27,7 +27,7 @@ The app opens with the Template Editor view. The SQLite database is auto-created
 
 ### Step 1: Create a Bank Profile
 
-Before creating templates, you need at least one bank in the system. The app stores templates per bank so you can manage multiple chequebooks.
+In **Template Editor**, enter the bank name under **Add a bank**, click **Add**, and select it from the Bank list. The app stores templates per bank so you can manage multiple chequebooks.
 
 ### Step 2: Scan Your Cheque
 
@@ -57,13 +57,13 @@ Save as JPEG or PNG.
 
 Before printing on a real cheque:
 
-1. Load a sheet of plain paper into your printer's manual/bypass tray
-2. Print an alignment test (grid + field outlines print on the paper)
-3. Hold the printed paper up against your actual cheque leaf
-4. Check if the field outlines line up with the printed areas on the cheque
-5. If they're off, adjust the **Offset X/Y** values in the template (e.g., if text is 2mm too far right, set Offset X to -2)
-6. Repeat until alignment is perfect
-7. Save the template again
+1. Cut plain paper to the exact measured cheque size and load one sheet in the rear/manual feed
+2. Select the calibration printer and its physical paper source in Template Editor
+3. Click **Print Alignment Test** (a grid and field outlines print on the paper)
+4. Hold the printed paper up against your actual cheque leaf
+5. Check if the field outlines line up with the printed areas on the cheque
+6. If they're off, adjust the **Offset X/Y** values in the template (e.g., if text is 2mm too far right, set Offset X to -2)
+7. Repeat until alignment is correct, then save the template again
 
 You only need to do this once per template. After calibration, every cheque prints correctly.
 
@@ -79,8 +79,11 @@ You only need to do this once per template. After calibration, every cheque prin
 4. Click **"Add to Print Queue"**
 5. Navigate to **"Print Queue"**
 6. Select your printer from the dropdown
-7. Feed a cheque leaf into the printer's manual tray
-8. Click **"Print Selected"** or **"Print All"**
+7. Select the rear/manual paper source and feed exactly one cheque leaf
+8. Click **Print Selected** or **Print Next**, then confirm the safety prompt
+9. Inspect and remove the physical cheque. Click **Confirm Printed** only when it is correct.
+
+Windows accepting a print job changes its status to **Submitted**, not **Printed**. If it did not physically print, use **Requeue** only after checking the printer queue to avoid duplicates.
 
 ### Step 6: Batch Printing (CSV Import)
 
@@ -97,26 +100,42 @@ ABC Corp,12500.50,2024-12-15,000124,Monthly rent
 2. In the **New Cheque** view, select a template
 3. Click **"Import CSV"** and select your file
 4. All cheques appear in the Print Queue
-5. Print them one by one (feed each cheque leaf into the tray between prints)
+5. Use **Print Next** and confirm each physical cheque separately. The application never sends the whole batch unattended.
 
 ---
 
-## Printer Setup Tips
+## Supported Printer Setup
 
-### HP LaserJet Custom Paper Size
+Always install the manufacturer's full Windows driver. Windows class drivers may omit custom paper sizes or physical paper-source names.
+
+### Canon MAXIFY GX7040
+
+- Use the **rear tray**, selected in both ChequeMate and the Canon driver/printer screen.
+- Custom media must be 89–216 mm on the short edge and 127–1200 mm on the long edge.
+- Plain paper must be 64–105 g/m².
+- A 200 × 90 mm cheque is supported; a 170 × 70 mm cheque is outside Canon's specified minimum.
+
+### Epson L220
+
+- Use the **rear paper feed**; it does not have a dedicated bypass tray.
+- Load one cheque at a time for controlled sequencing.
+- Epson specifies plain paper at 64–90 g/m².
+- Confirm that the installed Epson driver accepts the exact measured custom size before calibration.
+
+### Custom Paper Size
 
 Since cheques are smaller than standard paper, configure a custom size:
 
 1. Open **Windows Settings → Printers & Scanners**
-2. Select your HP LaserJet → **Printing Preferences**
+2. Select your printer → **Printing Preferences**
 3. Go to the **Paper** tab
 4. Click **Custom** and create a new size matching your cheque (e.g., 200mm × 90mm)
 5. Save it with a name like "Bank Cheque"
 
-### Manual Feed Tray
+### Rear or Manual Feed
 
-- Use the **manual/bypass tray** (usually the fold-down tray at the front)
-- Place the cheque face-up with the top edge going in first
+- Use the printer's rear/manual paper source selected in ChequeMate
+- Follow the printer guide for face-up/face-down orientation and run an alignment test before a real cheque
 - Set the paper guides snug against the cheque edges
 - The printer won't auto-pull from main tray when you select the manual source
 
@@ -143,7 +162,7 @@ Measure your actual cheque with a ruler to be sure.
 - If your scanner saves at 300 DPI, the auto-detected dimensions should be accurate
 - If using a phone photo, manually enter the cheque dimensions in mm
 - The "A/C Payee Only" field auto-fills the text — just position where you want it printed
-- Amount in words supports Lakhs/Crores numbering system by default
+- Amount wording uses the international Thousand/Million/Billion system. Currency and fractional-unit wording are editable on the New Cheque screen.
 - Save different templates for different cheque books, even from the same bank (personal vs. business)
 
 ---
@@ -151,6 +170,7 @@ Measure your actual cheque with a ruler to be sure.
 ## Data Location
 
 - Database: `%LocalAppData%\ChequeMate\chequemate.db`
+- Pre-upgrade database backups: `%LocalAppData%\ChequeMate\Backups`
 - Scanned images: stored wherever you save them (the template stores the file path)
 
 ---
@@ -162,6 +182,15 @@ Measure your actual cheque with a ruler to be sure.
 | Text prints too far left/right | Adjust Offset X in template settings |
 | Text prints too high/low | Adjust Offset Y in template settings |
 | Text gets cut off | Increase the field Width/Height |
-| Printer pulls from wrong tray | Set manual tray in printer preferences + app printer selection |
+| Printer pulls from wrong tray | Select the same rear/manual source in the printer, driver, and ChequeMate |
 | Image dimensions seem wrong | Manually enter physical cheque size in mm |
 | Font looks too small/big on cheque | Adjust Font Size (pt) for that field in template editor |
+
+## Acceptance Test Before Live Cheques
+
+1. Build and run the automated tests on the Windows deployment PC: `dotnet test`.
+2. Print the alignment grid on at least 10 cheque-sized plain sheets.
+3. Confirm every required field is inside the printer's physical margins.
+4. Check feed skew and repeatability; adjust offsets only after the paper feed is consistent.
+5. Test the Pending → Submitted → Confirm Printed workflow, including a deliberate cancel and requeue.
+6. Only then test one voided/sample cheque. Do not start with a live cheque.

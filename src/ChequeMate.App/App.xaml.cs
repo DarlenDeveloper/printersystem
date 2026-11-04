@@ -12,21 +12,32 @@ namespace ChequeMate.App;
 
 public partial class App : Application
 {
-    // Bump this number whenever you change the DB schema (add/remove columns, change types).
-    // The app will automatically wipe and recreate the DB on next launch.
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
         var services = new ServiceCollection();
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
 
-        EnsureDatabase();
+        try
+        {
+            EnsureDatabase();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"ChequeMate could not safely open its database. No data was deleted.\n\n{ex.Message}",
+                "Database error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(1);
+            return;
+        }
+
+        base.OnStartup(e);
     }
 
     private static void EnsureDatabase()
@@ -35,53 +46,81 @@ public partial class App : Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ChequeMate", "chequemate.db");
 
-        // If the DB exists, check if it was built with the current schema version.
-        // If not, delete it so EnsureCreated rebuilds it cleanly.
         if (File.Exists(dbPath))
         {
-            try
-            {
-                using var conn = new SqliteConnection($"Data Source={dbPath}");
-                conn.Open();
-                // Read stored schema version (table may not exist on first run)
-                int storedVersion = 0;
-                try
-                {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = "SELECT Value FROM AppMeta WHERE Key = 'SchemaVersion'";
-                    var result = cmd.ExecuteScalar();
-                    if (result != null) storedVersion = Convert.ToInt32(result);
-                }
-                catch { /* table doesn't exist yet */ }
-
-                if (storedVersion != SchemaVersion)
-                {
-                    conn.Close();
-                    SqliteConnection.ClearAllPools();
-                    File.Delete(dbPath);
-                }
-            }
-            catch
-            {
-                // Corrupted DB — delete and recreate
-                SqliteConnection.ClearAllPools();
-                File.Delete(dbPath);
-            }
+            ValidateDatabase(dbPath);
+            var storedVersion = ReadSchemaVersion(dbPath);
+            if (storedVersion != SchemaVersion)
+                BackUpDatabase(dbPath, storedVersion);
         }
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Database.EnsureCreated();
 
-        // Store the current schema version
+        db.Database.ExecuteSqlRaw(
+            "CREATE TABLE IF NOT EXISTS AppMeta (Key TEXT PRIMARY KEY, Value TEXT NOT NULL)");
+        db.Database.ExecuteSqlInterpolated(
+            $"INSERT OR REPLACE INTO AppMeta (Key, Value) VALUES ('SchemaVersion', {SchemaVersion})");
+    }
+
+    private static void ValidateDatabase(string dbPath)
+    {
         try
         {
-            db.Database.ExecuteSqlRaw(
-                "CREATE TABLE IF NOT EXISTS AppMeta (Key TEXT PRIMARY KEY, Value TEXT NOT NULL)");
-            db.Database.ExecuteSqlRaw(
-                $"INSERT OR REPLACE INTO AppMeta (Key, Value) VALUES ('SchemaVersion', '{SchemaVersion}')");
+            using var connection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA quick_check";
+            var result = command.ExecuteScalar()?.ToString();
+            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"SQLite integrity check returned: {result ?? "no result"}");
         }
-        catch { /* non-critical */ }
+        catch (Exception ex) when (ex is not InvalidDataException)
+        {
+            throw new InvalidDataException(
+                $"The database at '{dbPath}' could not be validated. Restore it from a backup or contact support.",
+                ex);
+        }
+    }
+
+    private static int ReadSchemaVersion(string dbPath)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT Value FROM AppMeta WHERE Key = 'SchemaVersion' AND " +
+            "EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'AppMeta')";
+
+        try
+        {
+            return command.ExecuteScalar() is { } value && int.TryParse(value.ToString(), out var version)
+                ? version
+                : 0;
+        }
+        catch (SqliteException)
+        {
+            return 0;
+        }
+    }
+
+    private static void BackUpDatabase(string dbPath, int storedVersion)
+    {
+        var databaseDirectory = Path.GetDirectoryName(dbPath)!;
+        var backupDirectory = Path.Combine(databaseDirectory, "Backups");
+        Directory.CreateDirectory(backupDirectory);
+
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var backupPath = Path.Combine(
+            backupDirectory,
+            $"chequemate-v{storedVersion}-{timestamp}.db");
+
+        using var source = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        using var destination = new SqliteConnection($"Data Source={backupPath}");
+        source.Open();
+        destination.Open();
+        source.BackupDatabase(destination);
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -92,8 +131,9 @@ public partial class App : Application
             "ChequeMate", "chequemate.db");
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite($"Data Source={dbPath}"));
+        services.AddDbContext<AppDbContext>(
+            options => options.UseSqlite($"Data Source={dbPath}"),
+            contextLifetime: ServiceLifetime.Transient);
 
         // Services
         services.AddTransient<IAmountToWordsService, AmountToWordsService>();
