@@ -1,0 +1,53 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Installer version (for example, 1.0.0)
+        required: true
+        default: 1.0.0
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Normalize tag version
+        shell: pwsh
+        run: |
+          $version = $env:VERSION.TrimStart('v')
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Restore and test
+        run: dotnet test ChequeMate.sln --configuration Release
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --no-progress --yes
+
+      - name: Build Setup executable
+        shell: pwsh
+        run: .\installer\build-installer.ps1 -Version $env:PACKAGE_VERSION
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChequeMate-${{ env.PACKAGE_VERSION }}-win-x64
+          path: |
+            artifacts/installer/*-Setup.exe
+            artifacts/installer/*.sha256
+          if-no-files-found: error
