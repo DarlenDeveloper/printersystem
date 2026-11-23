@@ -12,7 +12,7 @@ namespace ChequeMate.App;
 
 public partial class App : Application
 {
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
@@ -57,11 +57,43 @@ public partial class App : Application
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Database.EnsureCreated();
+        EnsureChequeTemplateRotationColumn(dbPath);
 
         db.Database.ExecuteSqlRaw(
             "CREATE TABLE IF NOT EXISTS AppMeta (Key TEXT PRIMARY KEY, Value TEXT NOT NULL)");
         db.Database.ExecuteSqlInterpolated(
             $"INSERT OR REPLACE INTO AppMeta (Key, Value) VALUES ('SchemaVersion', {SchemaVersion})");
+    }
+
+    private static void EnsureChequeTemplateRotationColumn(string dbPath)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var inspect = connection.CreateCommand();
+        inspect.CommandText = "PRAGMA table_info(ChequeTemplates)";
+        using var reader = inspect.ExecuteReader();
+        var hasRotationColumn = false;
+        while (reader.Read())
+        {
+            if (string.Equals(
+                    reader.GetString(reader.GetOrdinal("name")),
+                    "ChequeImageRotationDegrees",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                hasRotationColumn = true;
+                break;
+            }
+        }
+
+        if (hasRotationColumn)
+            return;
+
+        reader.Close();
+        using var upgrade = connection.CreateCommand();
+        upgrade.CommandText =
+            "ALTER TABLE ChequeTemplates ADD COLUMN ChequeImageRotationDegrees INTEGER NULL";
+        upgrade.ExecuteNonQuery();
     }
 
     private static void ValidateDatabase(string dbPath)

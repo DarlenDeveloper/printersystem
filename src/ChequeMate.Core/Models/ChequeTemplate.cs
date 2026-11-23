@@ -12,6 +12,11 @@ public class ChequeTemplate
     public string? ChequeImagePath { get; set; }
 
     /// <summary>
+    /// Clockwise preview rotation in degrees. Null lets legacy templates auto-detect orientation.
+    /// </summary>
+    public int? ChequeImageRotationDegrees { get; set; }
+
+    /// <summary>
     /// Physical width of the cheque in millimeters.
     /// </summary>
     public double PaperWidthMm { get; set; }

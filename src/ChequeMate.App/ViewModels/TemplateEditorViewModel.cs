@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -19,11 +20,12 @@ public partial class TemplateEditorViewModel : ObservableObject
     private readonly IBankProfileService _bankService;
     private readonly IPrintService _printService;
     private string? _chequeImageSourcePath;
+    private int? _chequeImageRotationDegrees;
 
     [ObservableProperty] private ObservableCollection<ChequeTemplate> _templates = new();
     [ObservableProperty] private ObservableCollection<BankProfile> _banks = new();
     [ObservableProperty] private ChequeTemplate? _selectedTemplate;
-    [ObservableProperty] private BitmapImage? _chequeImage;
+    [ObservableProperty] private BitmapSource? _chequeImage;
     [ObservableProperty] private string _templateName = string.Empty;
     [ObservableProperty] private double _paperWidthMm = 170;
     [ObservableProperty] private double _paperHeightMm = 70;
@@ -112,6 +114,7 @@ public partial class TemplateEditorViewModel : ObservableObject
             var preview = await LoadChequePreviewAsync(dialog.FileName);
             ChequeImage = preview.Bitmap;
             _chequeImageSourcePath = dialog.FileName;
+            _chequeImageRotationDegrees = preview.RotationDegrees;
             PaperWidthMm = preview.WidthMm;
             PaperHeightMm = preview.HeightMm;
             StatusMessage = preview.StatusMessage;
@@ -200,6 +203,7 @@ public partial class TemplateEditorViewModel : ObservableObject
         SelectedBankId = null;
         ChequeImage = null;
         _chequeImageSourcePath = null;
+        _chequeImageRotationDegrees = null;
         Fields.Clear();
         SelectedField = null;
         StatusMessage = "New template started.";
@@ -225,9 +229,12 @@ public partial class TemplateEditorViewModel : ObservableObject
         {
             try
             {
-                var preview = await LoadChequePreviewAsync(SelectedTemplate.ChequeImagePath);
+                var preview = await LoadChequePreviewAsync(
+                    SelectedTemplate.ChequeImagePath,
+                    SelectedTemplate.ChequeImageRotationDegrees);
                 ChequeImage = preview.Bitmap;
                 _chequeImageSourcePath = SelectedTemplate.ChequeImagePath;
+                _chequeImageRotationDegrees = preview.RotationDegrees;
             }
             catch (Exception ex)
             {
@@ -350,6 +357,7 @@ public partial class TemplateEditorViewModel : ObservableObject
             TemplateName = TemplateName.Trim(),
             BankProfileId = SelectedBankId,
             ChequeImagePath = _chequeImageSourcePath,
+            ChequeImageRotationDegrees = _chequeImageRotationDegrees,
             PaperWidthMm = PaperWidthMm,
             PaperHeightMm = PaperHeightMm,
             OffsetXMm = OffsetXMm,
@@ -399,22 +407,96 @@ public partial class TemplateEditorViewModel : ObservableObject
             : $"Field '{invalidField.DisplayName}' lies outside the cheque boundaries.";
     }
 
-    private static async Task<ChequePreview> LoadChequePreviewAsync(string path)
+    [RelayCommand]
+    private void RotateScanLeft() => RotateScan(-90);
+
+    [RelayCommand]
+    private void RotateScanRight() => RotateScan(90);
+
+    [RelayCommand]
+    private void ClearScan()
+    {
+        ChequeImage = null;
+        _chequeImageSourcePath = null;
+        _chequeImageRotationDegrees = null;
+        StatusMessage = "Scan cleared. Save the template to keep this change; the original file was not deleted.";
+    }
+
+    private void RotateScan(int deltaDegrees)
+    {
+        if (ChequeImage == null)
+        {
+            StatusMessage = "Import a scan before rotating it.";
+            return;
+        }
+
+        var oldWidth = PaperWidthMm;
+        var oldHeight = PaperHeightMm;
+        ChequeImage = RotateBitmap(ChequeImage, deltaDegrees);
+        RotateFields(deltaDegrees, oldWidth, oldHeight);
+        PaperWidthMm = oldHeight;
+        PaperHeightMm = oldWidth;
+        _chequeImageRotationDegrees = NormalizeRotation(
+            (_chequeImageRotationDegrees ?? 0) + deltaDegrees);
+        StatusMessage = deltaDegrees < 0 ? "Scan rotated left." : "Scan rotated right.";
+    }
+
+    private void RotateFields(int deltaDegrees, double oldWidth, double oldHeight)
+    {
+        foreach (var field in Fields)
+        {
+            var oldX = field.PositionXMm;
+            var oldY = field.PositionYMm;
+            var oldFieldWidth = field.WidthMm;
+            var oldFieldHeight = field.HeightMm;
+
+            if (deltaDegrees > 0)
+            {
+                field.PositionXMm = oldHeight - oldY - oldFieldHeight;
+                field.PositionYMm = oldX;
+            }
+            else
+            {
+                field.PositionXMm = oldY;
+                field.PositionYMm = oldWidth - oldX - oldFieldWidth;
+            }
+
+            field.WidthMm = oldFieldHeight;
+            field.HeightMm = oldFieldWidth;
+        }
+    }
+
+    private static async Task<ChequePreview> LoadChequePreviewAsync(
+        string path,
+        int? requestedRotationDegrees = null)
     {
         if (string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase))
-            return await LoadPdfPreviewAsync(path);
+            return await LoadPdfPreviewAsync(path, requestedRotationDegrees);
 
         var bitmap = LoadBitmap(path);
         var dpiX = bitmap.DpiX > 0 ? bitmap.DpiX : 96;
         var dpiY = bitmap.DpiY > 0 ? bitmap.DpiY : 96;
+        var widthMm = bitmap.PixelWidth / dpiX * 25.4;
+        var heightMm = bitmap.PixelHeight / dpiY * 25.4;
+        var rotation = requestedRotationDegrees ?? AutoRotation(widthMm, heightMm);
+        var rotated = RotateBitmap(bitmap, rotation);
+        if (IsQuarterTurn(rotation))
+            (widthMm, heightMm) = (heightMm, widthMm);
+
+        var rotationNote = requestedRotationDegrees == null && rotation != 0
+            ? " Auto-rotated to landscape."
+            : string.Empty;
         return new ChequePreview(
-            bitmap,
-            Math.Round(bitmap.PixelWidth / dpiX * 25.4, 1),
-            Math.Round(bitmap.PixelHeight / dpiY * 25.4, 1),
-            $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {dpiX:0.#} DPI");
+            rotated,
+            Math.Round(widthMm, 1),
+            Math.Round(heightMm, 1),
+            rotation,
+            $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {dpiX:0.#} DPI.{rotationNote}");
     }
 
-    private static async Task<ChequePreview> LoadPdfPreviewAsync(string path)
+    private static async Task<ChequePreview> LoadPdfPreviewAsync(
+        string path,
+        int? requestedRotationDegrees)
     {
         var file = await StorageFile.GetFileFromPathAsync(path);
         var document = await PdfDocument.LoadFromFileAsync(file);
@@ -448,15 +530,43 @@ public partial class TemplateEditorViewModel : ObservableObject
         bitmap.EndInit();
         bitmap.Freeze();
 
+        var widthMm = page.Size.Width / 96d * 25.4;
+        var heightMm = page.Size.Height / 96d * 25.4;
+        var rotation = requestedRotationDegrees ?? AutoRotation(widthMm, heightMm);
+        var rotated = RotateBitmap(bitmap, rotation);
+        if (IsQuarterTurn(rotation))
+            (widthMm, heightMm) = (heightMm, widthMm);
+
         var pageNote = document.PageCount > 1
             ? $" (showing page 1 of {document.PageCount})"
             : string.Empty;
+        var rotationNote = requestedRotationDegrees == null && rotation != 0
+            ? " Auto-rotated to landscape."
+            : string.Empty;
         return new ChequePreview(
-            bitmap,
-            Math.Round(page.Size.Width / 96d * 25.4, 1),
-            Math.Round(page.Size.Height / 96d * 25.4, 1),
-            $"PDF scan loaded{pageNote}: {bitmap.PixelWidth}x{bitmap.PixelHeight} preview");
+            rotated,
+            Math.Round(widthMm, 1),
+            Math.Round(heightMm, 1),
+            rotation,
+            $"PDF scan loaded{pageNote}: {bitmap.PixelWidth}x{bitmap.PixelHeight} preview.{rotationNote}");
     }
+
+    private static BitmapSource RotateBitmap(BitmapSource bitmap, int degrees)
+    {
+        var normalized = NormalizeRotation(degrees);
+        if (normalized == 0)
+            return bitmap;
+
+        var rotated = new TransformedBitmap(bitmap, new RotateTransform(normalized));
+        rotated.Freeze();
+        return rotated;
+    }
+
+    private static int AutoRotation(double width, double height) => height > width ? 270 : 0;
+
+    private static int NormalizeRotation(int degrees) => ((degrees % 360) + 360) % 360;
+
+    private static bool IsQuarterTurn(int degrees) => NormalizeRotation(degrees) is 90 or 270;
 
     private static BitmapImage LoadBitmap(string path)
     {
@@ -507,9 +617,10 @@ public partial class TemplateEditorViewModel : ObservableObject
     }
 
     private sealed record ChequePreview(
-        BitmapImage Bitmap,
+        BitmapSource Bitmap,
         double WidthMm,
         double HeightMm,
+        int RotationDegrees,
         string StatusMessage);
 }
 
