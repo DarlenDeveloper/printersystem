@@ -7,6 +7,9 @@ using ChequeMate.Core.Enums;
 using ChequeMate.Core.Models;
 using ChequeMate.Core.Services;
 using Microsoft.Win32;
+using Windows.Data.Pdf;
+using Windows.Storage;
+using Windows.Storage.Streams;
 
 namespace ChequeMate.App.ViewModels;
 
@@ -15,6 +18,7 @@ public partial class TemplateEditorViewModel : ObservableObject
     private readonly ITemplateService _templateService;
     private readonly IBankProfileService _bankService;
     private readonly IPrintService _printService;
+    private string? _chequeImageSourcePath;
 
     [ObservableProperty] private ObservableCollection<ChequeTemplate> _templates = new();
     [ObservableProperty] private ObservableCollection<BankProfile> _banks = new();
@@ -81,7 +85,7 @@ public partial class TemplateEditorViewModel : ObservableObject
             if (selectTemplateId.HasValue)
             {
                 SelectedTemplate = Templates.FirstOrDefault(t => t.Id == selectTemplateId.Value);
-                LoadTemplate();
+                await LoadTemplate();
             }
         }
         catch (Exception ex)
@@ -91,27 +95,35 @@ public partial class TemplateEditorViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ImportChequeImage()
+    private async Task ImportChequeImage()
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "Image files|*.jpg;*.jpeg;*.png;*.tiff;*.tif;*.bmp",
-            Title = "Select scanned cheque image"
+            Filter = "Cheque scans|*.jpg;*.jpeg;*.png;*.tiff;*.tif;*.bmp;*.pdf|Image files|*.jpg;*.jpeg;*.png;*.tiff;*.tif;*.bmp|PDF files|*.pdf",
+            Title = "Select scanned cheque image or PDF"
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
-        var bitmap = LoadBitmap(dialog.FileName);
-        ChequeImage = bitmap;
-
-        if (bitmap.DpiX > 0 && bitmap.DpiY > 0)
+        try
         {
-            PaperWidthMm = Math.Round(bitmap.PixelWidth / bitmap.DpiX * 25.4, 1);
-            PaperHeightMm = Math.Round(bitmap.PixelHeight / bitmap.DpiY * 25.4, 1);
+            IsBusy = true;
+            var preview = await LoadChequePreviewAsync(dialog.FileName);
+            ChequeImage = preview.Bitmap;
+            _chequeImageSourcePath = dialog.FileName;
+            PaperWidthMm = preview.WidthMm;
+            PaperHeightMm = preview.HeightMm;
+            StatusMessage = preview.StatusMessage;
         }
-
-        StatusMessage = $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {bitmap.DpiX:0.#} DPI";
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to import scan: {GetInnermostMessage(ex)}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
@@ -187,13 +199,14 @@ public partial class TemplateEditorViewModel : ObservableObject
         OffsetYMm = 0;
         SelectedBankId = null;
         ChequeImage = null;
+        _chequeImageSourcePath = null;
         Fields.Clear();
         SelectedField = null;
         StatusMessage = "New template started.";
     }
 
     [RelayCommand]
-    private void LoadTemplate()
+    private async Task LoadTemplate()
     {
         if (SelectedTemplate == null) return;
 
@@ -203,15 +216,31 @@ public partial class TemplateEditorViewModel : ObservableObject
         OffsetXMm = SelectedTemplate.OffsetXMm;
         OffsetYMm = SelectedTemplate.OffsetYMm;
         SelectedBankId = SelectedTemplate.BankProfileId;
-        ChequeImage = !string.IsNullOrEmpty(SelectedTemplate.ChequeImagePath) &&
-                      File.Exists(SelectedTemplate.ChequeImagePath)
-            ? LoadBitmap(SelectedTemplate.ChequeImagePath)
-            : null;
+        _chequeImageSourcePath = null;
+        ChequeImage = null;
+        var scanLoadFailed = false;
+
+        if (!string.IsNullOrEmpty(SelectedTemplate.ChequeImagePath) &&
+            File.Exists(SelectedTemplate.ChequeImagePath))
+        {
+            try
+            {
+                var preview = await LoadChequePreviewAsync(SelectedTemplate.ChequeImagePath);
+                ChequeImage = preview.Bitmap;
+                _chequeImageSourcePath = SelectedTemplate.ChequeImagePath;
+            }
+            catch (Exception ex)
+            {
+                scanLoadFailed = true;
+                StatusMessage = $"Template loaded, but its scan could not be opened: {GetInnermostMessage(ex)}";
+            }
+        }
 
         Fields = new ObservableCollection<TemplateFieldViewModel>(
             SelectedTemplate.Fields.Select(ToFieldViewModel));
         SelectedField = null;
-        StatusMessage = $"Loaded template: {TemplateName}";
+        if (!scanLoadFailed)
+            StatusMessage = $"Loaded template: {TemplateName}";
     }
 
     [RelayCommand]
@@ -320,7 +349,7 @@ public partial class TemplateEditorViewModel : ObservableObject
             Id = SelectedTemplate?.Id ?? 0,
             TemplateName = TemplateName.Trim(),
             BankProfileId = SelectedBankId,
-            ChequeImagePath = ChequeImage?.UriSource is { IsFile: true } uri ? uri.LocalPath : null,
+            ChequeImagePath = _chequeImageSourcePath,
             PaperWidthMm = PaperWidthMm,
             PaperHeightMm = PaperHeightMm,
             OffsetXMm = OffsetXMm,
@@ -370,6 +399,65 @@ public partial class TemplateEditorViewModel : ObservableObject
             : $"Field '{invalidField.DisplayName}' lies outside the cheque boundaries.";
     }
 
+    private static async Task<ChequePreview> LoadChequePreviewAsync(string path)
+    {
+        if (string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase))
+            return await LoadPdfPreviewAsync(path);
+
+        var bitmap = LoadBitmap(path);
+        var dpiX = bitmap.DpiX > 0 ? bitmap.DpiX : 96;
+        var dpiY = bitmap.DpiY > 0 ? bitmap.DpiY : 96;
+        return new ChequePreview(
+            bitmap,
+            Math.Round(bitmap.PixelWidth / dpiX * 25.4, 1),
+            Math.Round(bitmap.PixelHeight / dpiY * 25.4, 1),
+            $"Image loaded: {bitmap.PixelWidth}x{bitmap.PixelHeight} @ {dpiX:0.#} DPI");
+    }
+
+    private static async Task<ChequePreview> LoadPdfPreviewAsync(string path)
+    {
+        var file = await StorageFile.GetFileFromPathAsync(path);
+        var document = await PdfDocument.LoadFromFileAsync(file);
+        if (document.PageCount == 0)
+            throw new InvalidDataException("The PDF has no pages.");
+
+        using var page = document.GetPage(0);
+        const double previewDpi = 150;
+        var scale = previewDpi / 96d;
+        var options = new PdfPageRenderOptions
+        {
+            DestinationWidth = Math.Max(1, (uint)Math.Round(page.Size.Width * scale)),
+            DestinationHeight = Math.Max(1, (uint)Math.Round(page.Size.Height * scale))
+        };
+
+        using var rendered = new InMemoryRandomAccessStream();
+        await page.RenderToStreamAsync(rendered, options);
+        rendered.Seek(0);
+
+        using var reader = new DataReader(rendered.GetInputStreamAt(0));
+        var byteCount = checked((uint)rendered.Size);
+        await reader.LoadAsync(byteCount);
+        var bytes = new byte[checked((int)byteCount)];
+        reader.ReadBytes(bytes);
+
+        using var imageStream = new MemoryStream(bytes, writable: false);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = imageStream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+
+        var pageNote = document.PageCount > 1
+            ? $" (showing page 1 of {document.PageCount})"
+            : string.Empty;
+        return new ChequePreview(
+            bitmap,
+            Math.Round(page.Size.Width / 96d * 25.4, 1),
+            Math.Round(page.Size.Height / 96d * 25.4, 1),
+            $"PDF scan loaded{pageNote}: {bitmap.PixelWidth}x{bitmap.PixelHeight} preview");
+    }
+
     private static BitmapImage LoadBitmap(string path)
     {
         var bitmap = new BitmapImage();
@@ -417,6 +505,12 @@ public partial class TemplateEditorViewModel : ObservableObject
             exception = exception.InnerException;
         return exception.Message;
     }
+
+    private sealed record ChequePreview(
+        BitmapImage Bitmap,
+        double WidthMm,
+        double HeightMm,
+        string StatusMessage);
 }
 
 public partial class TemplateFieldViewModel : ObservableObject
