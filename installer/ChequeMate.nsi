@@ -1,5 +1,7 @@
-Unicode True
-SetCompressor /SOLID lzma
+; Installer UI/path strings are ASCII; the .NET application itself remains fully Unicode.
+Unicode False
+; zlib keeps cross-platform build memory bounded for the self-contained .NET payload.
+SetCompressor zlib
 
 !ifndef APP_VERSION
   !define APP_VERSION "1.0.0"
@@ -31,6 +33,7 @@ VIAddVersionKey /LANG=1033 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=1033 "CompanyName" "${APP_PUBLISHER}"
 VIAddVersionKey /LANG=1033 "FileDescription" "ChequeMate Windows installer"
 VIAddVersionKey /LANG=1033 "FileVersion" "${APP_FILE_VERSION}"
+VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright ${APP_PUBLISHER}"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${APP_VERSION}"
 
 Page directory
@@ -57,8 +60,8 @@ Section "Install" SEC_MAIN
   WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "${APP_PUBLISHER}"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\${APP_EXE}"
-  WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '$"$INSTDIR\Uninstall.exe$"'
-  WriteRegStr HKLM "${UNINSTALL_KEY}" "QuietUninstallString" '$"$INSTDIR\Uninstall.exe$" /S'
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "QuietUninstallString" "$\"$INSTDIR\Uninstall.exe$\" /S"
   WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair" 1
 SectionEnd
