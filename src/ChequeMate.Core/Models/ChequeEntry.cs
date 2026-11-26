@@ -1,4 +1,5 @@
 using ChequeMate.Core.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ChequeMate.Core.Models;
 
@@ -19,4 +20,20 @@ public class ChequeEntry
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ChequeTemplate? Template { get; set; }
+    public ICollection<PrintHistory> PrintHistories { get; set; } = new List<PrintHistory>();
+
+    [NotMapped]
+    public string? LastPrintError
+    {
+        get
+        {
+            var latestAttempt = PrintHistories
+                .OrderByDescending(history => history.PrintedAt)
+                .ThenByDescending(history => history.Id)
+                .FirstOrDefault();
+            return latestAttempt is { Success: false }
+                ? latestAttempt.ErrorMessage ?? "The print attempt failed without a driver message."
+                : null;
+        }
+    }
 }

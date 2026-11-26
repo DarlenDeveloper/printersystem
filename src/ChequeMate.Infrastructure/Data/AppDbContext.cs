@@ -60,7 +60,7 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.ChequeEntry)
-                  .WithMany()
+                  .WithMany(e => e.PrintHistories)
                   .HasForeignKey(e => e.ChequeEntryId)
                   .OnDelete(DeleteBehavior.Cascade);
         });

@@ -12,7 +12,10 @@ public partial class PrintQueueView : UserControl
         DataContextChanged += (_, e) =>
         {
             if (e.NewValue is PrintQueueViewModel viewModel)
+            {
                 viewModel.ConfirmAction = ConfirmAction;
+                viewModel.ShowErrorAction = ShowError;
+            }
         };
     }
 
@@ -23,4 +26,12 @@ public partial class PrintQueueView : UserControl
             "ChequeMate",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+    private void ShowError(string message) =>
+        MessageBox.Show(
+            Window.GetWindow(this),
+            message,
+            "ChequeMate - Print failed",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
 }

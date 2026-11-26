@@ -23,6 +23,7 @@ public partial class PrintQueueViewModel : ObservableObject
     [ObservableProperty] private bool _isPrinting;
 
     public Func<string, bool>? ConfirmAction { get; set; }
+    public Action<string>? ShowErrorAction { get; set; }
 
     public PrintQueueViewModel(IChequeService chequeService, IPrintService printService)
     {
@@ -129,6 +130,7 @@ public partial class PrintQueueViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusMessage = $"Alignment print failed: {ex.Message}";
+            ShowErrorAction?.Invoke(StatusMessage);
         }
         finally
         {
@@ -250,14 +252,18 @@ public partial class PrintQueueViewModel : ObservableObject
                 cheque,
                 SelectedPrinter,
                 SelectedPaperSource);
-            StatusMessage = result.Success
+            var resultMessage = result.Success
                 ? $"Job submitted for {DescribeCheque(cheque)}. Inspect it, then click Confirm Printed."
-                : $"Print submission failed: {result.ErrorMessage}";
+                : $"Print submission failed: {result.ErrorMessage ?? "The printer returned no details."}";
             await RefreshQueueAsync();
+            StatusMessage = resultMessage;
+            if (!result.Success)
+                ShowErrorAction?.Invoke(resultMessage);
         }
         catch (Exception ex)
         {
             StatusMessage = $"Print submission failed: {ex.Message}";
+            ShowErrorAction?.Invoke(StatusMessage);
         }
         finally
         {

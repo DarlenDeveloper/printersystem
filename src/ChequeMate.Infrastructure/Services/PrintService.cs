@@ -39,15 +39,18 @@ public class PrintService : IPrintService
             PrinterName = printerName,
             PrintedAt = DateTime.UtcNow
         };
+        var failureStage = "validating the cheque layout and printer media";
 
         try
         {
             ValidateTemplate(template);
             ValidateKnownPrinterMedia(printerName, template);
+            failureStage = "recording the print attempt";
             entry.PrintStatus = PrintStatus.Printing;
             persistedEntry.PrintStatus = PrintStatus.Printing;
             await _db.SaveChangesAsync();
 
+            failureStage = "configuring the Windows printer, paper source and exact paper size";
             using var printDocument = CreatePrintDocument(
                 template,
                 printerName,
@@ -68,6 +71,7 @@ public class PrintService : IPrintService
 
             // Print() returning means Windows accepted the job. It does not prove that
             // ink reached the cheque, so an operator must confirm it separately.
+            failureStage = "submitting the job to the Windows print spooler";
             await Task.Run(printDocument.Print);
 
             entry.PrintStatus = PrintStatus.Submitted;
@@ -77,7 +81,7 @@ public class PrintService : IPrintService
         {
             entry.PrintStatus = PrintStatus.Failed;
             history.Success = false;
-            history.ErrorMessage = ex.Message;
+            history.ErrorMessage = BuildFailureReason(failureStage, ex);
         }
 
         _db.PrintHistories.Add(history);
@@ -283,5 +287,23 @@ public class PrintService : IPrintService
             ? entry.Id.ToString()
             : entry.ChequeNumber;
         return $"ChequeMate cheque {identifier}";
+    }
+
+    private static string BuildFailureReason(string stage, Exception exception)
+    {
+        var messages = new List<string>();
+        for (var current = exception; current != null; current = current.InnerException)
+        {
+            if (!string.IsNullOrWhiteSpace(current.Message) &&
+                !messages.Contains(current.Message, StringComparer.OrdinalIgnoreCase))
+            {
+                messages.Add(current.Message.Trim());
+            }
+        }
+
+        var detail = messages.Count == 0
+            ? exception.GetType().Name
+            : string.Join(" -> ", messages);
+        return $"Failed while {stage}: {detail} (Windows code 0x{exception.HResult:X8}).";
     }
 }

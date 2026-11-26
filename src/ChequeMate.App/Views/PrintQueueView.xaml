@@ -52,11 +52,14 @@
                     <DataGridTextColumn Header="Date" Binding="{Binding ChequeDate, StringFormat=dd/MM/yyyy}" Width="100"/>
                     <DataGridTextColumn Header="Cheque #" Binding="{Binding ChequeNumber}" Width="100"/>
                     <DataGridTextColumn Header="Status" Binding="{Binding PrintStatus}" Width="80"/>
+                    <DataGridTextColumn Header="Failure reason" Binding="{Binding LastPrintError}" Width="360"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
 
-        <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" 
-                   Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+        <TextBox Grid.Row="3" Text="{Binding StatusMessage, Mode=OneWay}"
+                 IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
+                 Background="Transparent" Foreground="{StaticResource MutedTextBrush}"
+                 Margin="0,8,0,0"/>
     </Grid>
 </UserControl>
