@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TemplateName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.VerificationStatus).HasConversion<string>();
             entity.HasOne(e => e.BankProfile)
                   .WithMany(b => b.Templates)
                   .HasForeignKey(e => e.BankProfileId)

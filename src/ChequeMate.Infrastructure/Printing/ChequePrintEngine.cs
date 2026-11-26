@@ -78,6 +78,17 @@ public class ChequePrintEngine
         }
 
         // Draw field outlines with labels
+        var clearBandTop = totalHeight - (float)UgandaChequeStandardValidator.ClearBandHeightMm;
+        var restraintLeft = totalWidth - (float)UgandaChequeStandardValidator.RestraintAreaWidthMm;
+        using var protectedBrush = new SolidBrush(Color.FromArgb(45, Color.OrangeRed));
+        using var protectedPen = new Pen(Color.OrangeRed, 0.4f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+        graphics.FillRectangle(protectedBrush, 0, clearBandTop, totalWidth, (float)UgandaChequeStandardValidator.ClearBandHeightMm);
+        graphics.DrawRectangle(protectedPen, 0, clearBandTop, totalWidth, (float)UgandaChequeStandardValidator.ClearBandHeightMm);
+        graphics.DrawString("PROTECTED MICR CLEAR BAND - DO NOT PRINT", font, brush, 3, clearBandTop + 3);
+        graphics.FillRectangle(protectedBrush, restraintLeft, 0, (float)UgandaChequeStandardValidator.RestraintAreaWidthMm, clearBandTop);
+        graphics.DrawRectangle(protectedPen, restraintLeft, 0, (float)UgandaChequeStandardValidator.RestraintAreaWidthMm, clearBandTop);
+
+        // Draw field outlines with labels
         using var fieldPen = new Pen(Color.Red, 0.3f);
         foreach (var field in template.Fields)
         {

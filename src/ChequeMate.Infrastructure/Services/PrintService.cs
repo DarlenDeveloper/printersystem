@@ -51,7 +51,8 @@ public class PrintService : IPrintService
             using var printDocument = CreatePrintDocument(
                 template,
                 printerName,
-                paperSourceName);
+                paperSourceName,
+                useA4Overlay: false);
 
             printDocument.DocumentName = BuildDocumentName(entry);
             printDocument.PrintPage += (_, e) =>
@@ -92,12 +93,15 @@ public class PrintService : IPrintService
         string paperSourceName)
     {
         ValidateTemplate(template);
-        ValidateKnownPrinterMedia(printerName, template);
+        var useA4Overlay = RequiresA4Overlay(printerName, template);
+        if (!useA4Overlay)
+            ValidateKnownPrinterMedia(printerName, template);
 
         using var printDocument = CreatePrintDocument(
             template,
             printerName,
-            paperSourceName);
+            paperSourceName,
+            useA4Overlay);
 
         printDocument.DocumentName = $"ChequeMate alignment - {template.TemplateName}";
         printDocument.PrintPage += (_, e) =>
@@ -144,7 +148,8 @@ public class PrintService : IPrintService
     private static PrintDocument CreatePrintDocument(
         ChequeTemplate template,
         string printerName,
-        string paperSourceName)
+        string paperSourceName,
+        bool useA4Overlay)
     {
         if (string.IsNullOrWhiteSpace(printerName))
             throw new InvalidOperationException("Select a printer before printing.");
@@ -178,10 +183,12 @@ public class PrintService : IPrintService
                 $"Paper source '{paperSourceName}' is no longer available on '{printerName}'.");
         }
 
-        var paperSize = PaperSizeHelper.GetOrCreatePaperSize(
+        var pageWidthMm = useA4Overlay ? 210 : template.PaperWidthMm;
+        var pageHeightMm = useA4Overlay ? 297 : template.PaperHeightMm;
+        var paperSize = PaperSizeHelper.GetRequiredPaperSize(
             document.PrinterSettings,
-            template.PaperWidthMm,
-            template.PaperHeightMm,
+            pageWidthMm,
+            pageHeightMm,
             out var landscape);
 
         document.DefaultPageSettings.PaperSource = source;
@@ -221,19 +228,34 @@ public class PrintService : IPrintService
 
         foreach (var field in template.Fields)
         {
-            if (field.PositionXMm < 0 || field.PositionYMm < 0 ||
+            var effectiveX = field.PositionXMm + template.OffsetXMm;
+            var effectiveY = field.PositionYMm + template.OffsetYMm;
+            if (effectiveX < 0 || effectiveY < 0 ||
                 field.WidthMm <= 0 || field.HeightMm <= 0 ||
-                field.PositionXMm + field.WidthMm > template.PaperWidthMm ||
-                field.PositionYMm + field.HeightMm > template.PaperHeightMm)
+                effectiveX + field.WidthMm > template.PaperWidthMm ||
+                effectiveY + field.HeightMm > template.PaperHeightMm)
             {
                 throw new InvalidOperationException(
                     $"Field '{field.Label ?? field.FieldType.ToString()}' lies outside the cheque boundaries.");
             }
         }
+
+        var protectedZoneError = UgandaChequeStandardValidator.ValidateProtectedZones(template);
+        if (protectedZoneError != null)
+            throw new InvalidOperationException(protectedZoneError);
     }
 
     private static void ValidateKnownPrinterMedia(string printerName, ChequeTemplate template)
     {
+        if (RequiresA4Overlay(printerName, template))
+        {
+            throw new InvalidOperationException(
+                "Epson L220 direct printing is not supported for this cheque size. " +
+                "The L220's smallest supported sheet is 89 x 127 mm, while this cheque is " +
+                $"{template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm. " +
+                "Use Alignment Test for an A4 overlay, or use a printer that officially supports the cheque leaf.");
+        }
+
         var isCanonGx7000 = printerName.Contains("GX70", StringComparison.OrdinalIgnoreCase) ||
                             printerName.Contains("GX7000", StringComparison.OrdinalIgnoreCase);
         if (!isCanonGx7000)
@@ -248,6 +270,12 @@ public class PrintService : IPrintService
                 $"This template is {template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm.");
         }
     }
+
+    private static bool RequiresA4Overlay(string printerName, ChequeTemplate template)
+        => PaperSizeHelper.RequiresEpsonL220A4Overlay(
+            printerName,
+            template.PaperWidthMm,
+            template.PaperHeightMm);
 
     private static string BuildDocumentName(ChequeEntry entry)
     {

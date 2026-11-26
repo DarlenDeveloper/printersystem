@@ -16,7 +16,11 @@ public class BankProfileService : IBankProfileService
 
     public async Task<List<BankProfile>> GetAllAsync()
     {
-        return await _db.BankProfiles.AsNoTracking().OrderBy(b => b.BankName).ToListAsync();
+        return await _db.BankProfiles
+            .AsNoTracking()
+            .Where(b => b.IsSupported)
+            .OrderBy(b => b.BankName)
+            .ToListAsync();
     }
 
     public async Task<BankProfile?> GetByIdAsync(int id)

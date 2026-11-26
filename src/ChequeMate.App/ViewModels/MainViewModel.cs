@@ -9,20 +9,13 @@ public partial class MainViewModel : ObservableObject
     private object? _currentView;
 
     [ObservableProperty]
-    private string _currentViewName = "Templates";
+    private string _currentViewName = "New Cheque";
 
     private readonly IServiceProvider _services;
 
     public MainViewModel(IServiceProvider services)
     {
         _services = services;
-    }
-
-    [RelayCommand]
-    private void NavigateToTemplates()
-    {
-        CurrentView = _services.GetService(typeof(TemplateEditorViewModel));
-        CurrentViewName = "Template Editor";
     }
 
     [RelayCommand]

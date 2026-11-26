@@ -26,6 +26,9 @@
             <Button Content="Print Next" Command="{Binding PrintNextCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                     IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
+            <Button Content="Alignment Test" Command="{Binding PrintAlignmentTestCommand}"
+                    Background="#D97706" Foreground="White" Padding="12,6" Margin="0,0,8,0"
+                    IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
             <Button Content="Confirm Printed" Command="{Binding ConfirmPrintedCommand}"
                     Background="#15803D" Foreground="White" Padding="12,6" Margin="0,0,8,0"/>
             <Button Content="Requeue" Command="{Binding RequeueCommand}"
@@ -42,6 +45,8 @@
                       AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal" BorderThickness="0">
                 <DataGrid.Columns>
+                    <DataGridTextColumn Header="Bank" Binding="{Binding Template.BankProfile.BankName}" Width="180"/>
+                    <DataGridTextColumn Header="Cheque type" Binding="{Binding Template.TemplateName}" Width="180"/>
                     <DataGridTextColumn Header="Payee" Binding="{Binding Payee}" Width="*"/>
                     <DataGridTextColumn Header="Amount" Binding="{Binding AmountFigures, StringFormat=N2}" Width="120"/>
                     <DataGridTextColumn Header="Date" Binding="{Binding ChequeDate, StringFormat=dd/MM/yyyy}" Width="100"/>

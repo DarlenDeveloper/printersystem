@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using ChequeMate.Core.Enums;
 using ChequeMate.Core.Models;
 using ChequeMate.Core.Services;
+using ChequeMate.Infrastructure.Printing;
 
 namespace ChequeMate.App.ViewModels;
 
@@ -86,6 +87,53 @@ public partial class PrintQueueViewModel : ObservableObject
 
         SelectedCheque = next;
         await SubmitChequeAsync(next);
+    }
+
+    [RelayCommand]
+    private async Task PrintAlignmentTest()
+    {
+        var template = SelectedCheque?.Template;
+        if (template == null)
+        {
+            StatusMessage = "Select a queued cheque to choose its bank layout.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedPrinter) || string.IsNullOrWhiteSpace(SelectedPaperSource))
+        {
+            StatusMessage = "Select a printer and its rear/manual paper source.";
+            return;
+        }
+
+        var epsonA4Overlay = PaperSizeHelper.RequiresEpsonL220A4Overlay(
+            SelectedPrinter,
+            template.PaperWidthMm,
+            template.PaperHeightMm);
+        var paperInstruction = epsonA4Overlay
+            ? $"Load one plain A4 sheet into '{SelectedPaperSource}' on '{SelectedPrinter}'. " +
+              $"ChequeMate will draw the {template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm cheque outline at the A4 top-left for overlay checking."
+            : $"Load plain paper cut to {template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm " +
+              $"into '{SelectedPaperSource}' on '{SelectedPrinter}'.";
+        var prompt = $"TEST ONLY. {paperInstruction} Never use a live cheque for alignment. Continue?";
+        if (ConfirmAction?.Invoke(prompt) != true)
+            return;
+
+        IsPrinting = true;
+        try
+        {
+            await _printService.PrintAlignmentTestAsync(template, SelectedPrinter, SelectedPaperSource);
+            StatusMessage = epsonA4Overlay
+                ? "A4 overlay grid submitted. Align the VOID cheque with the printed top-left outline; do not feed the cheque directly."
+                : "Alignment grid submitted. Compare it with a VOID specimen and record any mismatch.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Alignment print failed: {ex.Message}";
+        }
+        finally
+        {
+            IsPrinting = false;
+        }
     }
 
     [RelayCommand]
@@ -178,8 +226,19 @@ public partial class PrintQueueViewModel : ObservableObject
         var size = template == null
             ? "the configured size"
             : $"{template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm";
+        var isVerified = template?.VerificationStatus == TemplateVerificationStatus.Verified;
+        var isKnownNonImpactPrinter = SelectedPrinter.Contains("L220", StringComparison.OrdinalIgnoreCase) ||
+                                      SelectedPrinter.Contains("GX70", StringComparison.OrdinalIgnoreCase) ||
+                                      SelectedPrinter.Contains("GX7000", StringComparison.OrdinalIgnoreCase);
+        var stockInstruction = isVerified
+            ? "Load exactly one approved cheque"
+            : "TEST ONLY: load plain paper or one clearly marked VOID specimen";
         var prompt =
-            $"Load exactly one blank cheque ({size}) into '{SelectedPaperSource}' on '{SelectedPrinter}'.\n\n" +
+            $"{stockInstruction} ({size}) into '{SelectedPaperSource}' on '{SelectedPrinter}'.\n\n" +
+            (isVerified ? string.Empty : "Do not use a live cheque with this unverified layout.\n\n") +
+            (isKnownNonImpactPrinter
+                ? "This is a non-impact inkjet printer. Bank approval is required before live use.\n\n"
+                : string.Empty) +
             $"Ready to submit cheque {DescribeCheque(cheque)}?";
         if (ConfirmAction?.Invoke(prompt) != true)
             return;

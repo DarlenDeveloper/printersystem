@@ -22,9 +22,6 @@
                            Foreground="{StaticResource PrimaryBrush}" 
                            Margin="16,0,16,24"/>
 
-                <Button Content="📝 Template Editor" 
-                        Command="{Binding NavigateToTemplatesCommand}"
-                        Style="{StaticResource NavButton}" Margin="8,2"/>
                 <Button Content="✏️ New Cheque" 
                         Command="{Binding NavigateToChequeEntryCommand}"
                         Style="{StaticResource NavButton}" Margin="8,2"/>
@@ -40,9 +37,6 @@
                 <Binding Path="CurrentView"/>
             </ContentControl.Content>
             <ContentControl.Resources>
-                <DataTemplate DataType="{x:Type vm:TemplateEditorViewModel}">
-                    <views:TemplateEditorView/>
-                </DataTemplate>
                 <DataTemplate DataType="{x:Type vm:ChequeEntryViewModel}">
                     <views:ChequeEntryView/>
                 </DataTemplate>

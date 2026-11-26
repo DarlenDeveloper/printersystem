@@ -13,9 +13,18 @@
 
         <Border Grid.Row="1" Style="{StaticResource CardBorder}">
             <StackPanel MaxWidth="500" HorizontalAlignment="Left">
-                <TextBlock Text="Template / Bank" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBlock Text="Bank" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <ComboBox ItemsSource="{Binding Banks}" SelectedItem="{Binding SelectedBank}"
+                          DisplayMemberPath="BankName" Margin="0,2,0,12"/>
+
+                <TextBlock Text="Cheque type" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
-                          DisplayMemberPath="TemplateName" Margin="0,2,0,12"/>
+                          DisplayMemberPath="TemplateName" Margin="0,2,0,6"/>
+                <Border Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1"
+                        CornerRadius="4" Padding="8" Margin="0,0,0,12">
+                    <TextBlock Text="{Binding TemplateStatusMessage}" Foreground="#92400E"
+                               FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </Border>
 
                 <TextBlock Text="Payee Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <TextBox Text="{Binding Payee, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>

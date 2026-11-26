@@ -12,7 +12,7 @@ namespace ChequeMate.App;
 
 public partial class App : Application
 {
-    private const int SchemaVersion = 4;
+    private const int SchemaVersion = 5;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
@@ -57,7 +57,9 @@ public partial class App : Application
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Database.EnsureCreated();
-        EnsureChequeTemplateRotationColumn(dbPath);
+        EnsureSupportedBankColumn(dbPath);
+        EnsureTemplateVerificationColumn(dbPath);
+        UgandaTemplateSeeder.Seed(db);
 
         db.Database.ExecuteSqlRaw(
             "CREATE TABLE IF NOT EXISTS AppMeta (Key TEXT PRIMARY KEY, Value TEXT NOT NULL)");
@@ -65,34 +67,55 @@ public partial class App : Application
             $"INSERT OR REPLACE INTO AppMeta (Key, Value) VALUES ('SchemaVersion', {SchemaVersion})");
     }
 
-    private static void EnsureChequeTemplateRotationColumn(string dbPath)
+    private static void EnsureSupportedBankColumn(string dbPath)
+    {
+        EnsureColumn(
+            dbPath,
+            "BankProfiles",
+            "IsSupported",
+            "ALTER TABLE BankProfiles ADD COLUMN IsSupported INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void EnsureTemplateVerificationColumn(string dbPath)
+    {
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "VerificationStatus",
+            "ALTER TABLE ChequeTemplates ADD COLUMN VerificationStatus TEXT NOT NULL DEFAULT 'StandardTestOnly'");
+    }
+
+    private static void EnsureColumn(
+        string dbPath,
+        string tableName,
+        string columnName,
+        string alterSql)
     {
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
 
         using var inspect = connection.CreateCommand();
-        inspect.CommandText = "PRAGMA table_info(ChequeTemplates)";
+        inspect.CommandText = $"PRAGMA table_info({tableName})";
         using var reader = inspect.ExecuteReader();
-        var hasRotationColumn = false;
+        var hasColumn = false;
         while (reader.Read())
         {
             if (string.Equals(
                     reader.GetString(reader.GetOrdinal("name")),
-                    "ChequeImageRotationDegrees",
+                    columnName,
                     StringComparison.OrdinalIgnoreCase))
             {
-                hasRotationColumn = true;
+                hasColumn = true;
                 break;
             }
         }
 
-        if (hasRotationColumn)
+        if (hasColumn)
             return;
 
         reader.Close();
         using var upgrade = connection.CreateCommand();
-        upgrade.CommandText =
-            "ALTER TABLE ChequeTemplates ADD COLUMN ChequeImageRotationDegrees INTEGER NULL";
+        upgrade.CommandText = alterSql;
         upgrade.ExecuteNonQuery();
     }
 
@@ -177,7 +200,6 @@ public partial class App : Application
 
         // ViewModels
         services.AddTransient<ViewModels.MainViewModel>();
-        services.AddTransient<ViewModels.TemplateEditorViewModel>();
         services.AddTransient<ViewModels.ChequeEntryViewModel>();
         services.AddTransient<ViewModels.PrintQueueViewModel>();
     }

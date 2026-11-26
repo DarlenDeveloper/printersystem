@@ -28,10 +28,11 @@ public static class PaperSizeHelper
     }
 
     /// <summary>
-    /// Finds a matching paper size from the printer's supported sizes,
-    /// or returns a custom one if no match found.
+    /// Finds a matching paper size already registered in the printer driver.
+    /// Drivers commonly replace an unregistered in-memory custom size with A4,
+    /// so printing is stopped when no matching driver size exists.
     /// </summary>
-    public static PaperSize GetOrCreatePaperSize(
+    public static PaperSize GetRequiredPaperSize(
         PrinterSettings printer,
         double widthMm,
         double heightMm,
@@ -65,11 +66,32 @@ public static class PaperSizeHelper
         }
 
         landscape = templateIsLandscape;
-        return CreateChequePaperSize(widthMm, heightMm);
+        throw new InvalidOperationException(
+            $"The '{printer.PrinterName}' driver has no registered {widthMm:0.#} x {heightMm:0.#} mm paper size. " +
+            "Open Windows Printing Preferences for this printer, create a User-Defined size, save it, " +
+            "then restart ChequeMate. The job was stopped to prevent the driver from silently using A4.");
     }
 
     public static int MmToHundredthsOfInch(double millimetres) =>
         (int)Math.Round(millimetres / 25.4 * 100, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Returns true when the named printer is an Epson L220 and the requested
+    /// sheet is smaller than Epson's supported 89 x 127 mm single-sheet limit.
+    /// </summary>
+    public static bool RequiresEpsonL220A4Overlay(
+        string printerName,
+        double widthMm,
+        double heightMm)
+    {
+        ValidateDimensions(widthMm, heightMm);
+        if (!printerName.Contains("L220", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var shortEdge = Math.Min(widthMm, heightMm);
+        var longEdge = Math.Max(widthMm, heightMm);
+        return shortEdge < 89 || longEdge < 127;
+    }
 
     private static void ValidateDimensions(double widthMm, double heightMm)
     {

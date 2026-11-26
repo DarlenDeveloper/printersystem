@@ -11,8 +11,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = App.Services.GetRequiredService<MainViewModel>();
 
-        // Navigate to template editor by default
+        // The client workflow starts with choosing a supported bank.
         var vm = (MainViewModel)DataContext;
-        vm.NavigateToTemplatesCommand.Execute(null);
+        vm.NavigateToChequeEntryCommand.Execute(null);
     }
 }

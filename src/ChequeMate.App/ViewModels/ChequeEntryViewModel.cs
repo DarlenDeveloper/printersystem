@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ChequeMate.Core.Enums;
 using ChequeMate.Core.Models;
 using ChequeMate.Core.Services;
 
@@ -10,8 +11,11 @@ public partial class ChequeEntryViewModel : ObservableObject
 {
     private readonly IChequeService _chequeService;
     private readonly ITemplateService _templateService;
+    private readonly IBankProfileService _bankService;
     private readonly IAmountToWordsService _amountToWords;
 
+    [ObservableProperty] private ObservableCollection<BankProfile> _banks = new();
+    [ObservableProperty] private BankProfile? _selectedBank;
     [ObservableProperty] private ObservableCollection<ChequeTemplate> _templates = new();
     [ObservableProperty] private ChequeTemplate? _selectedTemplate;
     [ObservableProperty] private string _payee = string.Empty;
@@ -23,17 +27,20 @@ public partial class ChequeEntryViewModel : ObservableObject
     [ObservableProperty] private string _chequeNumber = string.Empty;
     [ObservableProperty] private string _memo = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
+    [ObservableProperty] private string _templateStatusMessage = string.Empty;
 
     public ChequeEntryViewModel(
         IChequeService chequeService,
         ITemplateService templateService,
+        IBankProfileService bankService,
         IAmountToWordsService amountToWords)
     {
         _chequeService = chequeService;
         _templateService = templateService;
+        _bankService = bankService;
         _amountToWords = amountToWords;
         UpdateAmountWords();
-        _ = LoadTemplatesAsync();
+        _ = LoadBanksAsync();
     }
 
     partial void OnAmountFiguresChanged(decimal value)
@@ -44,22 +51,55 @@ public partial class ChequeEntryViewModel : ObservableObject
     partial void OnCurrencyNameChanged(string value) => UpdateAmountWords();
     partial void OnFractionalUnitNameChanged(string value) => UpdateAmountWords();
 
+    partial void OnSelectedBankChanged(BankProfile? value) =>
+        _ = LoadTemplatesForBankAsync(value?.Id);
+
+    partial void OnSelectedTemplateChanged(ChequeTemplate? value)
+    {
+        TemplateStatusMessage = value == null
+            ? "Choose a cheque type."
+            : value.VerificationStatus == TemplateVerificationStatus.Verified
+                ? "VERIFIED: this layout has been approved for live use."
+                : "TEST ONLY: use plain paper or a VOID specimen. Do not use a live cheque.";
+    }
+
     private void UpdateAmountWords()
     {
         AmountWords = _amountToWords.Convert(AmountFigures, CurrencyName, FractionalUnitName);
     }
 
-    private async Task LoadTemplatesAsync()
+    private async Task LoadBanksAsync()
     {
         try
         {
-            var templates = await _templateService.GetAllTemplatesAsync();
-            Templates = new ObservableCollection<ChequeTemplate>(templates);
-            SelectedTemplate ??= Templates.FirstOrDefault();
+            var banks = await _bankService.GetAllAsync();
+            Banks = new ObservableCollection<BankProfile>(banks);
+            SelectedBank = Banks.FirstOrDefault();
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Unable to load templates: {ex.Message}";
+            StatusMessage = $"Unable to load supported banks: {ex.Message}";
+        }
+    }
+
+    private async Task LoadTemplatesForBankAsync(int? bankId)
+    {
+        SelectedTemplate = null;
+        Templates.Clear();
+        if (!bankId.HasValue)
+            return;
+
+        try
+        {
+            var templates = await _templateService.GetTemplatesByBankAsync(bankId.Value);
+            Templates = new ObservableCollection<ChequeTemplate>(
+                templates.OrderBy(template => template.PaperWidthMm)
+                    .ThenBy(template => template.PaperHeightMm));
+            SelectedTemplate = Templates.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Unable to load cheque types: {ex.Message}";
         }
     }
 

@@ -24,6 +24,8 @@ public class ChequeService : IChequeService
         return await _db.ChequeEntries
             .Include(e => e.Template)
                 .ThenInclude(t => t!.Fields)
+            .Include(e => e.Template)
+                .ThenInclude(t => t!.BankProfile)
             .Where(e => e.PrintStatus != PrintStatus.Printed)
             .OrderBy(e => e.CreatedAt)
             .ToListAsync();
@@ -34,6 +36,8 @@ public class ChequeService : IChequeService
         return await _db.ChequeEntries
             .Include(e => e.Template)
                 .ThenInclude(t => t!.Fields)
+            .Include(e => e.Template)
+                .ThenInclude(t => t!.BankProfile)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
     }
@@ -43,6 +47,8 @@ public class ChequeService : IChequeService
         return await _db.ChequeEntries
             .Include(e => e.Template)
             .ThenInclude(t => t!.Fields)
+            .Include(e => e.Template)
+            .ThenInclude(t => t!.BankProfile)
             .FirstOrDefaultAsync(e => e.Id == id);
     }
 

@@ -2,8 +2,6 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:converters="clr-namespace:ChequeMate.App.Converters"
-             xmlns:enums="clr-namespace:ChequeMate.Core.Enums;assembly=ChequeMate.Core"
-             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
@@ -11,21 +9,7 @@
                 <ResourceDictionary Source="Resources/Styles/AppStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <converters:MmToPixelConverter x:Key="MmToPixelConverter"/>
             <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
-
-            <ObjectDataProvider x:Key="FieldTypeValues" MethodName="GetValues" 
-                                ObjectType="{x:Type sys:Enum}">
-                <ObjectDataProvider.MethodParameters>
-                    <x:Type TypeName="enums:FieldType"/>
-                </ObjectDataProvider.MethodParameters>
-            </ObjectDataProvider>
-            <ObjectDataProvider x:Key="TextAlignmentValues" MethodName="GetValues"
-                                ObjectType="{x:Type sys:Enum}">
-                <ObjectDataProvider.MethodParameters>
-                    <x:Type TypeName="enums:TextAlignment"/>
-                </ObjectDataProvider.MethodParameters>
-            </ObjectDataProvider>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

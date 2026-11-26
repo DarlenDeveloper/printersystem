@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Windows desktop application (C# / WPF / .NET 8) that prints variable data (payee, date, amount) onto pre-printed bank cheque leaves with precise alignment. Users scan their cheque, visually map field positions, save templates per bank, and batch-print cheques.
+A Windows desktop application (C# / WPF / .NET 8) that prints variable data (payee, date, amount) onto pre-printed Ugandan bank cheque leaves with precise alignment. Clients choose a supported bank and controlled cheque format; they do not import scans or create arbitrary layouts.
 
 ---
 
@@ -14,7 +14,6 @@ A Windows desktop application (C# / WPF / .NET 8) that prints variable data (pay
 | Architecture | MVVM (CommunityToolkit.Mvvm) |
 | Database | SQLite (via EF Core) |
 | Printing | System.Drawing.Printing + WPF PrintVisual |
-| Image Handling | System.Drawing / WPF BitmapImage |
 | DI | Microsoft.Extensions.DependencyInjection |
 | PDF Export | QuestPDF (optional, for preview/archive) |
 
@@ -61,12 +60,10 @@ ChequeMate/
 │       ├── MainWindow.xaml
 │       ├── ViewModels/
 │       │   ├── MainViewModel.cs
-│       │   ├── TemplateEditorViewModel.cs
 │       │   ├── ChequeEntryViewModel.cs
 │       │   ├── PrintQueueViewModel.cs
 │       │   └── SettingsViewModel.cs
 │       ├── Views/
-│       │   ├── TemplateEditorView.xaml       # WYSIWYG canvas editor
 │       │   ├── ChequeEntryView.xaml          # Data entry form
 │       │   ├── PrintQueueView.xaml           # Batch queue management
 │       │   ├── TemplateListView.xaml         # Saved templates browser
@@ -100,22 +97,16 @@ ChequeMate/
 - [ ] Implement `ChequeService` (CRUD for cheque entries)
 - [ ] Unit tests for amount-to-words conversion
 
-### Phase 2: Template Editor (The Heart)
+### Phase 2: Controlled Uganda Bank Templates
 
-**Goal:** WYSIWYG canvas where user scans a cheque image and maps field positions.
+**Goal:** Bank-first selection backed by reviewed, versioned layouts.
 
-- [ ] Import cheque scan (JPEG/PNG/TIFF) — file picker or scanner integration (WIA)
-- [ ] Display scanned cheque as canvas background at actual DPI scale
-- [ ] DPI/scale calibration:
-  - User inputs physical cheque dimensions (width × height in mm)
-  - System calculates pixels-per-mm ratio from image resolution
-  - All field positions stored in mm (not pixels) for print accuracy
-- [ ] Draggable/resizable field rectangles on the canvas
-  - Each field has: type, position (X, Y in mm), width, height, font family, font size, alignment, padding
-- [ ] Field property panel (edit font, size, alignment per field)
-- [ ] Save template (stores: bank name, cheque image path, paper dimensions, field positions)
-- [ ] Load/edit existing templates
-- [ ] Delete template
+- [x] Fixed supported-bank selector
+- [x] Uganda-standard personal and corporate test formats
+- [x] Verification status on every template
+- [x] Protected 16 mm MICR clear band and 51 mm restraint area
+- [x] No client-side scan/PDF importing or arbitrary template creation
+- [ ] Replace test-only layouts with verified current bank variants as specimens are approved
 
 ### Phase 3: Print Engine
 
@@ -186,16 +177,7 @@ ChequeMate/
 - Store paper size per template
 - Guide user to also set custom size in HP printer driver (manual feed tray)
 
-### 3. Scanner/Image Import DPI
-
-**Problem:** Scanned image must map 1:1 to physical cheque for accurate field placement.
-
-**Solution:**
-- Read DPI metadata from scanned image
-- If DPI unknown, require user to input physical dimensions → calculate scale
-- Display image at true scale (1mm on screen ≈ 1mm on print) when possible, or show a zoom with scale indicator
-
-### 4. Concurrent Printing
+### 3. Concurrent Printing
 
 **Problem:** Multiple cheques in queue shouldn't block the UI.
 
@@ -220,10 +202,8 @@ CREATE TABLE ChequeTemplates (
     Id INTEGER PRIMARY KEY,
     BankProfileId INTEGER REFERENCES BankProfiles(Id),
     TemplateName TEXT NOT NULL,
-    ChequeImagePath TEXT,
     PaperWidthMm REAL NOT NULL,
     PaperHeightMm REAL NOT NULL,
-    ImageDpi REAL,
     OffsetXMm REAL DEFAULT 0,
     OffsetYMm REAL DEFAULT 0,
     CreatedAt TEXT NOT NULL,

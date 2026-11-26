@@ -1,3 +1,5 @@
+using ChequeMate.Core.Enums;
+
 namespace ChequeMate.Core.Models;
 
 public class ChequeTemplate
@@ -5,16 +7,6 @@ public class ChequeTemplate
     public int Id { get; set; }
     public int? BankProfileId { get; set; }
     public string TemplateName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Path to the scanned cheque image used as the visual alignment guide.
-    /// </summary>
-    public string? ChequeImagePath { get; set; }
-
-    /// <summary>
-    /// Clockwise preview rotation in degrees. Null lets legacy templates auto-detect orientation.
-    /// </summary>
-    public int? ChequeImageRotationDegrees { get; set; }
 
     /// <summary>
     /// Physical width of the cheque in millimeters.
@@ -27,11 +19,6 @@ public class ChequeTemplate
     public double PaperHeightMm { get; set; }
 
     /// <summary>
-    /// DPI of the scanned image (used for pixel-to-mm mapping in the editor).
-    /// </summary>
-    public double? ImageDpi { get; set; }
-
-    /// <summary>
     /// Global horizontal offset in mm to fine-tune printer alignment.
     /// </summary>
     public double OffsetXMm { get; set; }
@@ -40,6 +27,18 @@ public class ChequeTemplate
     /// Global vertical offset in mm to fine-tune printer alignment.
     /// </summary>
     public double OffsetYMm { get; set; }
+
+    public TemplateVerificationStatus VerificationStatus { get; set; } =
+        TemplateVerificationStatus.StandardTestOnly;
+
+    public string VerificationLabel => VerificationStatus switch
+    {
+        TemplateVerificationStatus.Verified => "Verified for live use",
+        TemplateVerificationStatus.LegacyCandidate => "Legacy candidate - test only",
+        _ => "Uganda standard base - test only"
+    };
+
+    public string DisplayName => $"{TemplateName} [{VerificationLabel}]";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
