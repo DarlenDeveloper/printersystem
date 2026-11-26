@@ -1,4 +1,5 @@
 using System.Drawing.Printing;
+using ChequeMate.Core.Enums;
 
 namespace ChequeMate.Infrastructure.Printing;
 
@@ -28,48 +29,63 @@ public static class PaperSizeHelper
     }
 
     /// <summary>
-    /// Finds a matching paper size already registered in the printer driver.
-    /// Drivers commonly replace an unregistered in-memory custom size with A4,
-    /// so printing is stopped when no matching driver size exists.
+    /// Creates the page requested by ChequeMate without requiring a named Windows form.
+    /// The printer driver may still reject a size outside its supported physical range.
     /// </summary>
-    public static PaperSize GetRequiredPaperSize(
-        PrinterSettings printer,
-        double widthMm,
-        double heightMm,
-        out bool landscape)
-    {
-        ValidateDimensions(widthMm, heightMm);
-        var templateIsLandscape = widthMm > heightMm;
-        int targetWidth = MmToHundredthsOfInch(Math.Min(widthMm, heightMm));
-        int targetHeight = MmToHundredthsOfInch(Math.Max(widthMm, heightMm));
+    public static PaperSize CreateDirectPaperSize(double pageWidthMm, double pageHeightMm) =>
+        new(
+            "ChequeMate exact size",
+            MmToHundredthsOfInch(pageWidthMm),
+            MmToHundredthsOfInch(pageHeightMm));
 
-        // Check if printer already has a matching size (within 2mm tolerance)
-        int tolerance = 8; // ~2mm in hundredths of inch
+    public static PaperSize GetA4PaperSize(PrinterSettings printer)
+    {
         foreach (PaperSize size in printer.PaperSizes)
         {
-            var directMatch = Math.Abs(size.Width - targetWidth) <= tolerance &&
-                              Math.Abs(size.Height - targetHeight) <= tolerance;
-            var rotatedMatch = Math.Abs(size.Height - targetWidth) <= tolerance &&
-                               Math.Abs(size.Width - targetHeight) <= tolerance;
-            if (directMatch)
+            if (size.Kind == PaperKind.A4 ||
+                (Math.Abs(size.Width - 827) <= 8 && Math.Abs(size.Height - 1169) <= 8) ||
+                (Math.Abs(size.Height - 827) <= 8 && Math.Abs(size.Width - 1169) <= 8))
             {
-                landscape = templateIsLandscape;
-                return size;
-            }
-            if (rotatedMatch)
-            {
-                // Some drivers store user-defined forms in their already-rotated
-                // orientation. Do not rotate such a form a second time.
-                landscape = !templateIsLandscape;
                 return size;
             }
         }
 
-        landscape = templateIsLandscape;
-        throw new InvalidOperationException(
-            $"The '{printer.PrinterName}' driver has no registered {widthMm:0.#} x {heightMm:0.#} mm paper size. " +
-            "Open Windows Printing Preferences for this printer, create a User-Defined size, save it, " +
-            "then restart ChequeMate. The job was stopped to prevent the driver from silently using A4.");
+        // A4 is a standard Windows DMPAPER value; this fallback avoids any custom form.
+        return new PaperSize("A4", 827, 1169) { RawKind = (int)PaperKind.A4 };
+    }
+
+    public static bool IsKnownDirectFeedUnsupported(
+        string printerName,
+        double widthMm,
+        double heightMm)
+    {
+        ValidateDimensions(widthMm, heightMm);
+        var shortEdge = Math.Min(widthMm, heightMm);
+        var longEdge = Math.Max(widthMm, heightMm);
+
+        var isEpsonL220 = printerName.Contains("L220", StringComparison.OrdinalIgnoreCase);
+        var isCanonGx7000 = printerName.Contains("GX70", StringComparison.OrdinalIgnoreCase) ||
+                            printerName.Contains("GX7000", StringComparison.OrdinalIgnoreCase);
+
+        return (isEpsonL220 || isCanonGx7000) && (shortEdge < 89 || longEdge < 127);
+    }
+
+    public static string DescribeMediaSupport(
+        string printerName,
+        double widthMm,
+        double heightMm,
+        PrintMode mode)
+    {
+        if (mode == PrintMode.A4Positioned)
+        {
+            return IsKnownDirectFeedUnsupported(printerName, widthMm, heightMm)
+                ? "A4 test only: this printer cannot officially feed the cheque leaf itself because one edge is below 89 mm."
+                : "No Windows custom form is needed. Use a full A4 test sheet first; after alignment, the cut sheet may be fed in the saved position.";
+        }
+
+        return IsKnownDirectFeedUnsupported(printerName, widthMm, heightMm)
+            ? "Exact-size direct feed is blocked: this printer's minimum supported sheet is 89 x 127 mm."
+            : "ChequeMate will send the exact dimensions directly. The driver may still reject or substitute the size; run Alignment Test first.";
     }
 
     public static int MmToHundredthsOfInch(double millimetres) =>

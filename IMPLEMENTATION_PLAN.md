@@ -112,14 +112,14 @@ ChequeMate/
 
 **Goal:** Render only the text fields at exact coordinates onto the physical cheque.
 
-- [ ] `ChequePrintEngine` — takes a `ChequeEntry` + `ChequeTemplate`, renders text at field coordinates
-- [ ] Custom paper size setup (programmatically set via Windows print spooler API or printer driver)
-- [ ] `PaperSizeHelper` — creates/selects custom paper size matching cheque dimensions
-- [ ] Coordinate mapping: template mm positions → print document coordinates (accounting for margins, DPI)
-- [ ] Print only text (no background image, no borders — just the field values)
-- [ ] Alignment offset settings (global X/Y offset in mm to compensate for printer feed variance)
-- [ ] Alignment test print: prints a grid/crosshair pattern on plain paper so user can overlay on cheque and verify
-- [ ] Printer selection (enumerate available printers, let user pick and set as default for cheque printing)
+- [x] `ChequePrintEngine` renders text at physical millimetre coordinates
+- [x] A4-positioned mode avoids Windows custom-form creation
+- [x] Exact-size mode sends application-defined width and height directly
+- [x] Long-edge and short-edge feed transforms
+- [x] Left, centre and right paper-guide placement
+- [x] Per-printer/per-size X/Y calibration with save and clear
+- [x] Alignment test grid on the same renderer and placement path as cheque data
+- [x] Printer and paper-source selection, including driver default source
 
 ### Phase 4: Cheque Entry & Batch Printing
 

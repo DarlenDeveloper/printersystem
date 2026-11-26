@@ -4,7 +4,7 @@
         xmlns:views="clr-namespace:ChequeMate.App.Views"
         xmlns:vm="clr-namespace:ChequeMate.App.ViewModels"
         Title="ChequeMate - Cheque Printing System" 
-        Height="720" Width="1100"
+        Height="820" Width="1280" MinHeight="720" MinWidth="1100"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
     

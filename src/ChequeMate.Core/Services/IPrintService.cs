@@ -10,7 +10,8 @@ public interface IPrintService
     Task<PrintHistory> PrintChequeAsync(
         ChequeEntry entry,
         string printerName,
-        string paperSourceName);
+        string? paperSourceName,
+        PrintJobOptions options);
 
     /// <summary>
     /// Prints an alignment test page for calibration.
@@ -18,7 +19,8 @@ public interface IPrintService
     Task PrintAlignmentTestAsync(
         ChequeTemplate template,
         string printerName,
-        string paperSourceName);
+        string? paperSourceName,
+        PrintJobOptions options);
 
     /// <summary>
     /// Gets available printer names on the system.

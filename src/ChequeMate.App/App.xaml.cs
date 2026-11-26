@@ -196,6 +196,7 @@ public partial class App : Application
         services.AddTransient<IChequeService, ChequeService>();
         services.AddTransient<IBankProfileService, BankProfileService>();
         services.AddTransient<IPrintService, PrintService>();
+        services.AddSingleton<IPrinterProfileService, PrinterProfileService>();
         services.AddSingleton<ChequePrintEngine>();
 
         // ViewModels

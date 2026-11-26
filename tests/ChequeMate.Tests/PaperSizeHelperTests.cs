@@ -37,4 +37,21 @@ public class PaperSizeHelperTests
             expected,
             PaperSizeHelper.RequiresEpsonL220A4Overlay(printerName, widthMm, heightMm));
     }
+
+    [Theory]
+    [InlineData("EPSON L220 Series", 165, 73, true)]
+    [InlineData("EPSON L220 Series", 203, 101.6, false)]
+    [InlineData("Canon MAXIFY GX7040", 178, 76, true)]
+    [InlineData("Canon MAXIFY GX7040", 203, 101.6, false)]
+    [InlineData("EPSON PLQ-50", 165, 73, false)]
+    public void IsKnownDirectFeedUnsupported_UsesDocumentedConsumerPrinterMinimums(
+        string printerName,
+        double widthMm,
+        double heightMm,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            PaperSizeHelper.IsKnownDirectFeedUnsupported(printerName, widthMm, heightMm));
+    }
 }

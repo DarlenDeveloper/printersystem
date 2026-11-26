@@ -22,7 +22,8 @@ public class PrintService : IPrintService
     public async Task<PrintHistory> PrintChequeAsync(
         ChequeEntry entry,
         string printerName,
-        string paperSourceName)
+        string? paperSourceName,
+        PrintJobOptions options)
     {
         var template = entry.Template
             ?? throw new InvalidOperationException("Cheque entry must have a loaded template.");
@@ -44,18 +45,18 @@ public class PrintService : IPrintService
         try
         {
             ValidateTemplate(template);
-            ValidateKnownPrinterMedia(printerName, template);
+            ValidatePrintOptions(printerName, template, options);
             failureStage = "recording the print attempt";
             entry.PrintStatus = PrintStatus.Printing;
             persistedEntry.PrintStatus = PrintStatus.Printing;
             await _db.SaveChangesAsync();
 
-            failureStage = "configuring the Windows printer, paper source and exact paper size";
+            failureStage = "configuring the Windows printer and selected print method";
             using var printDocument = CreatePrintDocument(
                 template,
                 printerName,
                 paperSourceName,
-                useA4Overlay: false);
+                options);
 
             printDocument.DocumentName = BuildDocumentName(entry);
             printDocument.PrintPage += (_, e) =>
@@ -63,6 +64,7 @@ public class PrintService : IPrintService
                 if (e.Graphics != null)
                 {
                     ConfigurePhysicalPageCoordinates(e);
+                    ApplyChequePlacement(e.Graphics, template, options);
                     _engine.RenderCheque(e.Graphics, entry, template);
                 }
 
@@ -94,18 +96,17 @@ public class PrintService : IPrintService
     public async Task PrintAlignmentTestAsync(
         ChequeTemplate template,
         string printerName,
-        string paperSourceName)
+        string? paperSourceName,
+        PrintJobOptions options)
     {
         ValidateTemplate(template);
-        var useA4Overlay = RequiresA4Overlay(printerName, template);
-        if (!useA4Overlay)
-            ValidateKnownPrinterMedia(printerName, template);
+        ValidatePrintOptions(printerName, template, options);
 
         using var printDocument = CreatePrintDocument(
             template,
             printerName,
             paperSourceName,
-            useA4Overlay);
+            options);
 
         printDocument.DocumentName = $"ChequeMate alignment - {template.TemplateName}";
         printDocument.PrintPage += (_, e) =>
@@ -113,6 +114,7 @@ public class PrintService : IPrintService
             if (e.Graphics != null)
             {
                 ConfigurePhysicalPageCoordinates(e);
+                ApplyChequePlacement(e.Graphics, template, options);
                 _engine.RenderAlignmentTest(e.Graphics, template);
             }
 
@@ -152,13 +154,11 @@ public class PrintService : IPrintService
     private static PrintDocument CreatePrintDocument(
         ChequeTemplate template,
         string printerName,
-        string paperSourceName,
-        bool useA4Overlay)
+        string? paperSourceName,
+        PrintJobOptions options)
     {
         if (string.IsNullOrWhiteSpace(printerName))
             throw new InvalidOperationException("Select a printer before printing.");
-        if (string.IsNullOrWhiteSpace(paperSourceName))
-            throw new InvalidOperationException("Select the rear/manual paper source before printing.");
 
         var document = new PrintDocument
         {
@@ -173,32 +173,36 @@ public class PrintService : IPrintService
             throw new InvalidOperationException($"Printer '{printerName}' is not available.");
         }
 
-        var source = document.PrinterSettings.PaperSources
-            .Cast<PaperSource>()
-            .FirstOrDefault(item => string.Equals(
-                item.SourceName,
-                paperSourceName,
-                StringComparison.OrdinalIgnoreCase));
-
-        if (source == null)
+        if (!string.IsNullOrWhiteSpace(paperSourceName))
         {
-            document.Dispose();
-            throw new InvalidOperationException(
-                $"Paper source '{paperSourceName}' is no longer available on '{printerName}'.");
+            var source = document.PrinterSettings.PaperSources
+                .Cast<PaperSource>()
+                .FirstOrDefault(item => string.Equals(
+                    item.SourceName,
+                    paperSourceName,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (source == null)
+            {
+                document.Dispose();
+                throw new InvalidOperationException(
+                    $"Paper source '{paperSourceName}' is no longer available on '{printerName}'. " +
+                    "Select Default source or refresh the printer list.");
+            }
+
+            document.DefaultPageSettings.PaperSource = source;
         }
 
-        var pageWidthMm = useA4Overlay ? 210 : template.PaperWidthMm;
-        var pageHeightMm = useA4Overlay ? 297 : template.PaperHeightMm;
-        var paperSize = PaperSizeHelper.GetRequiredPaperSize(
-            document.PrinterSettings,
-            pageWidthMm,
-            pageHeightMm,
-            out var landscape);
+        var layout = ChequePageLayoutCalculator.Calculate(template, options);
+        var paperSize = options.Mode == PrintMode.A4Positioned
+            ? PaperSizeHelper.GetA4PaperSize(document.PrinterSettings)
+            : PaperSizeHelper.CreateDirectPaperSize(layout.PageWidthMm, layout.PageHeightMm);
 
-        document.DefaultPageSettings.PaperSource = source;
         document.DefaultPageSettings.PaperSize = paperSize;
         document.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
-        document.DefaultPageSettings.Landscape = landscape;
+        // The exact-size PaperSize is already created in its feed orientation.
+        // A4-positioned mode always uses portrait A4.
+        document.DefaultPageSettings.Landscape = false;
         return document;
     }
 
@@ -215,6 +219,28 @@ public class PrintService : IPrintService
         var hardMarginXMm = e.PageSettings.HardMarginX * 25.4f / 100f;
         var hardMarginYMm = e.PageSettings.HardMarginY * 25.4f / 100f;
         e.Graphics.TranslateTransform(-hardMarginXMm, -hardMarginYMm);
+    }
+
+    private static void ApplyChequePlacement(
+        Graphics graphics,
+        ChequeTemplate template,
+        PrintJobOptions options)
+    {
+        var layout = ChequePageLayoutCalculator.Calculate(template, options);
+
+        if (layout.RotateClockwise)
+        {
+            // Template coordinates remain measured from the cheque's printed top-left.
+            // Translate by the unrotated height so the 90-degree result stays positive.
+            graphics.TranslateTransform(
+                (float)(layout.OriginXMm + template.PaperHeightMm),
+                (float)layout.OriginYMm);
+            graphics.RotateTransform(90);
+        }
+        else
+        {
+            graphics.TranslateTransform((float)layout.OriginXMm, (float)layout.OriginYMm);
+        }
     }
 
     private static void ValidateTemplate(ChequeTemplate template)
@@ -249,37 +275,33 @@ public class PrintService : IPrintService
             throw new InvalidOperationException(protectedZoneError);
     }
 
-    private static void ValidateKnownPrinterMedia(string printerName, ChequeTemplate template)
+    private static void ValidatePrintOptions(
+        string printerName,
+        ChequeTemplate template,
+        PrintJobOptions options)
     {
-        if (RequiresA4Overlay(printerName, template))
+        ArgumentNullException.ThrowIfNull(options);
+        if (!double.IsFinite(options.OffsetXMm) || !double.IsFinite(options.OffsetYMm) ||
+            Math.Abs(options.OffsetXMm) > 25 || Math.Abs(options.OffsetYMm) > 25)
         {
             throw new InvalidOperationException(
-                "Epson L220 direct printing is not supported for this cheque size. " +
-                "The L220's smallest supported sheet is 89 x 127 mm, while this cheque is " +
-                $"{template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm. " +
-                "Use Alignment Test for an A4 overlay, or use a printer that officially supports the cheque leaf.");
+                "Printer calibration offsets must be between -25 mm and 25 mm.");
         }
 
-        var isCanonGx7000 = printerName.Contains("GX70", StringComparison.OrdinalIgnoreCase) ||
-                            printerName.Contains("GX7000", StringComparison.OrdinalIgnoreCase);
-        if (!isCanonGx7000)
-            return;
-
-        var shortEdge = Math.Min(template.PaperWidthMm, template.PaperHeightMm);
-        var longEdge = Math.Max(template.PaperWidthMm, template.PaperHeightMm);
-        if (shortEdge < 89 || shortEdge > 216 || longEdge < 127 || longEdge > 1200)
+        if (options.Mode == PrintMode.ExactChequeSize &&
+            PaperSizeHelper.IsKnownDirectFeedUnsupported(
+                printerName,
+                template.PaperWidthMm,
+                template.PaperHeightMm))
         {
             throw new InvalidOperationException(
-                "Canon MAXIFY GX7000-series custom media must be 89-216 mm wide and 127-1200 mm long. " +
-                $"This template is {template.PaperWidthMm:0.#} x {template.PaperHeightMm:0.#} mm.");
+                $"'{printerName}' cannot officially feed a {template.PaperWidthMm:0.#} x " +
+                $"{template.PaperHeightMm:0.#} mm sheet. Its minimum supported sheet is 89 x 127 mm. " +
+                "Choose A4 positioned mode for a plain-A4 alignment test, or use supported cheque hardware.");
         }
+
+        _ = ChequePageLayoutCalculator.Calculate(template, options);
     }
-
-    private static bool RequiresA4Overlay(string printerName, ChequeTemplate template)
-        => PaperSizeHelper.RequiresEpsonL220A4Overlay(
-            printerName,
-            template.PaperWidthMm,
-            template.PaperHeightMm);
 
     private static string BuildDocumentName(ChequeEntry entry)
     {

@@ -48,10 +48,12 @@ Section "Install" SEC_MAIN
 
   ; Replacing an existing installation in the same folder performs an in-place upgrade.
   File /r /x "*.pdb" "${PUBLISH_DIR}/*.*"
+  File /oname=USAGE.md "..\USAGE.md"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\ChequeMate"
   CreateShortcut "$SMPROGRAMS\ChequeMate\ChequeMate.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
+  CreateShortcut "$SMPROGRAMS\ChequeMate\Testing Guide.lnk" "$INSTDIR\USAGE.md"
   CreateShortcut "$DESKTOP\ChequeMate.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
 
   WriteRegStr HKLM "Software\ChequeMate" "InstallLocation" "$INSTDIR"
@@ -72,6 +74,7 @@ Section "Uninstall"
 
   Delete "$DESKTOP\ChequeMate.lnk"
   Delete "$SMPROGRAMS\ChequeMate\ChequeMate.lnk"
+  Delete "$SMPROGRAMS\ChequeMate\Testing Guide.lnk"
   RMDir "$SMPROGRAMS\ChequeMate"
 
   ; User templates, queue data, and backups live under LocalAppData and are preserved.

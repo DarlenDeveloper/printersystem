@@ -6,58 +6,125 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Print Queue" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
+        <TextBlock Grid.Row="0" Text="Print Queue &amp; Printer Setup"
+                   FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
 
-        <!-- Printer selection and actions -->
-        <WrapPanel Grid.Row="1" Margin="0,0,0,12">
-            <TextBlock Text="Printer:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox ItemsSource="{Binding Printers}" SelectedItem="{Binding SelectedPrinter}" 
-                      Width="220" Margin="0,0,12,0"/>
-            <TextBlock Text="Paper source:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox ItemsSource="{Binding PaperSources}" SelectedItem="{Binding SelectedPaperSource}"
-                      Width="170" Margin="0,0,12,0"/>
-            <Button Content="Print Selected" Command="{Binding PrintSelectedCommand}" 
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="One-time setup for the selected printer and cheque size"
+                           FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.25*"/>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="1.25*"/>
+                        <ColumnDefinition Width="1.25*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
+                        <TextBlock Text="Printer" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <ComboBox ItemsSource="{Binding Printers}" SelectedItem="{Binding SelectedPrinter}"
+                                  MinWidth="185"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,10,10">
+                        <TextBlock Text="Paper source" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <ComboBox ItemsSource="{Binding PaperSources}" SelectedItem="{Binding SelectedPaperSource}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,10,10">
+                        <TextBlock Text="Print method" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <ComboBox ItemsSource="{Binding PrintModes}" SelectedItem="{Binding SelectedPrintMode}"
+                                  DisplayMemberPath="Label"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="3" Margin="0,0,0,10">
+                        <TextBlock Text="Feed direction" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <ComboBox ItemsSource="{Binding FeedOrientations}" SelectedItem="{Binding SelectedFeedOrientation}"
+                                  DisplayMemberPath="Label"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Paper guide position" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <ComboBox ItemsSource="{Binding PaperAlignments}" SelectedItem="{Binding SelectedPaperAlignment}"
+                                  DisplayMemberPath="Label"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,10,0">
+                        <TextBlock Text="Calibration X (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBox Text="{Binding OffsetXMm, UpdateSourceTrigger=PropertyChanged, StringFormat=0.##}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,10,0">
+                        <TextBlock Text="Calibration Y (mm)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBox Text="{Binding OffsetYMm, UpdateSourceTrigger=PropertyChanged, StringFormat=0.##}"/>
+                    </StackPanel>
+
+                    <WrapPanel Grid.Row="1" Grid.Column="3" VerticalAlignment="Bottom">
+                        <Button Content="Save Setup" Command="{Binding SavePrinterSetupCommand}"
+                                Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
+                        <Button Content="Clear Setup" Command="{Binding ClearPrinterSetupCommand}"
+                                Foreground="White" Background="#64748B" Padding="12,6"/>
+                    </WrapPanel>
+                </Grid>
+
+                <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1"
+                        CornerRadius="4" Padding="10" Margin="0,12,0,6">
+                    <TextBlock Text="{Binding LoadingGuide}" TextWrapping="Wrap" Foreground="#1E3A5F"/>
+                </Border>
+                <TextBlock Text="{Binding SetupStatusMessage}" FontSize="11"
+                           Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <WrapPanel Grid.Row="2" Margin="0,0,0,12">
+            <Button Content="1. Print Alignment Test" Command="{Binding PrintAlignmentTestCommand}"
+                    Background="#D97706" Foreground="White" Padding="12,6" Margin="0,0,8,0"
+                    IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
+            <Button Content="2. Print Selected" Command="{Binding PrintSelectedCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                     IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
             <Button Content="Print Next" Command="{Binding PrintNextCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                     IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
-            <Button Content="Alignment Test" Command="{Binding PrintAlignmentTestCommand}"
-                    Background="#D97706" Foreground="White" Padding="12,6" Margin="0,0,8,0"
-                    IsEnabled="{Binding IsPrinting, Converter={StaticResource InverseBoolConverter}}"/>
-            <Button Content="Confirm Printed" Command="{Binding ConfirmPrintedCommand}"
+            <Button Content="3. Confirm Printed" Command="{Binding ConfirmPrintedCommand}"
                     Background="#15803D" Foreground="White" Padding="12,6" Margin="0,0,8,0"/>
             <Button Content="Requeue" Command="{Binding RequeueCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
-            <Button Content="Refresh" Command="{Binding RefreshQueueCommand}" 
+            <Button Content="Refresh" Command="{Binding RefreshQueueCommand}"
                     Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
-            <Button Content="Remove" Command="{Binding RemoveFromQueueCommand}" 
+            <Button Content="Remove" Command="{Binding RemoveFromQueueCommand}"
                     Foreground="White" Background="#DC2626" Padding="12,6"/>
         </WrapPanel>
 
-        <!-- Queue list -->
-        <Border Grid.Row="2" Style="{StaticResource CardBorder}">
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}">
             <DataGrid ItemsSource="{Binding PendingCheques}" SelectedItem="{Binding SelectedCheque}"
                       AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal" BorderThickness="0">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Bank" Binding="{Binding Template.BankProfile.BankName}" Width="180"/>
-                    <DataGridTextColumn Header="Cheque type" Binding="{Binding Template.TemplateName}" Width="180"/>
+                    <DataGridTextColumn Header="Bank" Binding="{Binding Template.BankProfile.BankName}" Width="170"/>
+                    <DataGridTextColumn Header="Cheque type" Binding="{Binding Template.TemplateName}" Width="190"/>
                     <DataGridTextColumn Header="Payee" Binding="{Binding Payee}" Width="*"/>
-                    <DataGridTextColumn Header="Amount" Binding="{Binding AmountFigures, StringFormat=N2}" Width="120"/>
-                    <DataGridTextColumn Header="Date" Binding="{Binding ChequeDate, StringFormat=dd/MM/yyyy}" Width="100"/>
-                    <DataGridTextColumn Header="Cheque #" Binding="{Binding ChequeNumber}" Width="100"/>
+                    <DataGridTextColumn Header="Amount" Binding="{Binding AmountFigures, StringFormat=N2}" Width="110"/>
+                    <DataGridTextColumn Header="Date" Binding="{Binding ChequeDate, StringFormat=dd/MM/yyyy}" Width="95"/>
+                    <DataGridTextColumn Header="Cheque #" Binding="{Binding ChequeNumber}" Width="90"/>
                     <DataGridTextColumn Header="Status" Binding="{Binding PrintStatus}" Width="80"/>
-                    <DataGridTextColumn Header="Failure reason" Binding="{Binding LastPrintError}" Width="360"/>
+                    <DataGridTextColumn Header="Failure reason" Binding="{Binding LastPrintError}" Width="300"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
 
-        <TextBox Grid.Row="3" Text="{Binding StatusMessage, Mode=OneWay}"
+        <TextBox Grid.Row="4" Text="{Binding StatusMessage, Mode=OneWay}"
                  IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
                  Background="Transparent" Foreground="{StaticResource MutedTextBrush}"
                  Margin="0,8,0,0"/>
