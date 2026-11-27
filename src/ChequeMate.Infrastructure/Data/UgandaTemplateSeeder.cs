@@ -226,7 +226,7 @@ public static class UgandaTemplateSeeder
             FieldType.AmountInFigures,
             "Amount in figures",
             amount,
-            9,
+            10,
             TextAlignment.Left,
             true));
     }

@@ -36,6 +36,11 @@ public class UgandaTemplateTests
             Assert.False(string.IsNullOrWhiteSpace(template.CurrencyCode));
             Assert.False(string.IsNullOrWhiteSpace(template.SpecimenReference));
             Assert.Equal(4, template.Fields.Count);
+            var amount = template.Fields.Single(field =>
+                field.FieldType == FieldType.AmountInFigures);
+            Assert.Equal("Arial", amount.FontFamily);
+            Assert.Equal(10, amount.FontSizePt);
+            Assert.True(amount.IsBold);
             Assert.True(UgandaChequeStandardValidator.IsStandardPaperSize(
                 template.PaperWidthMm,
                 template.PaperHeightMm));

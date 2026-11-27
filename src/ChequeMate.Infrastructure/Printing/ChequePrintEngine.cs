@@ -112,8 +112,7 @@ public class ChequePrintEngine
             FieldType.Payee => entry.Payee,
             FieldType.Date => entry.ChequeDate.ToString("dd/MM/yyyy"),
             FieldType.AmountInWords => entry.AmountWords,
-            FieldType.AmountInFigures =>
-                $"**{entry.AmountFigures.ToString("#,##0.00", CultureInfo.InvariantCulture)}**",
+            FieldType.AmountInFigures => FormatAmountFigures(entry.AmountFigures),
             FieldType.AccountPayee => "A/C Payee Only",
             FieldType.ChequeNumber => entry.ChequeNumber ?? "",
             FieldType.Memo => entry.Memo ?? "",
@@ -121,6 +120,11 @@ public class ChequePrintEngine
             _ => ""
         };
     }
+
+    public static string FormatAmountFigures(decimal amount) =>
+        amount.ToString(
+            amount == decimal.Truncate(amount) ? "#,##0" : "#,##0.00",
+            CultureInfo.InvariantCulture);
 
     private static void DrawFittedText(
         Graphics graphics,

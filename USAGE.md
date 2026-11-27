@@ -1,4 +1,4 @@
-# ChequeMate 2.1.1 - Windows testing guide
+# ChequeMate 2.1.2 - Windows testing guide
 
 ChequeMate prints variable text onto pre-printed Ugandan bank cheque leaves. It does not print bank artwork or MICR encoding.
 
@@ -38,6 +38,7 @@ ChequeMate enforces the BOU paper families and protected geometry:
 - Bottom 16 mm: protected MICR clear band; ordinary application text is blocked
 - Right 51 mm above the clear band: controlled restraint area for date and amount fields
 - Long payees or amount wording are reduced within a safe font range; printing stops instead of adding an ellipsis when text still cannot fit
+- Amount figures print as plain Arial Bold 10 pt numbers such as `5,000`, without surrounding asterisks or unnecessary `.00`; real cents remain visible
 
 ## First-time workflow
 
