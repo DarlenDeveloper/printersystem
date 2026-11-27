@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ChequeMate.Core.Enums;
 using ChequeMate.Core.Models;
 using ChequeMate.Core.Services;
 
@@ -37,12 +38,8 @@ public sealed class PrinterProfileService : IPrinterProfileService
             var profile = ReadProfiles().FirstOrDefault(item => Matches(
                 item, printerName, chequeWidthMm, chequeHeightMm));
 
-            return profile ?? new PrinterProfile
-            {
-                PrinterName = printerName,
-                ChequeWidthMm = chequeWidthMm,
-                ChequeHeightMm = chequeHeightMm
-            };
+            return profile ?? CreateRecommendedProfile(
+                printerName, chequeWidthMm, chequeHeightMm);
         }
     }
 
@@ -125,6 +122,32 @@ public sealed class PrinterProfileService : IPrinterProfileService
         string.Equals(profile.PrinterName, printerName, StringComparison.OrdinalIgnoreCase) &&
         Math.Abs(profile.ChequeWidthMm - chequeWidthMm) < 0.05 &&
         Math.Abs(profile.ChequeHeightMm - chequeHeightMm) < 0.05;
+
+    private static PrinterProfile CreateRecommendedProfile(
+        string printerName,
+        double chequeWidthMm,
+        double chequeHeightMm)
+    {
+        var isFieldTestedEpson203 =
+            printerName.Contains("L220", StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(chequeWidthMm - 203) < 0.05 &&
+            Math.Abs(chequeHeightMm - 101.6) < 0.05;
+
+        return new PrinterProfile
+        {
+            PrinterName = printerName,
+            ChequeWidthMm = chequeWidthMm,
+            ChequeHeightMm = chequeHeightMm,
+            Options = new PrintJobOptions
+            {
+                Mode = PrintMode.A4Positioned,
+                FeedOrientation = FeedOrientation.LongEdgeFirst,
+                PaperAlignment = PaperAlignment.Right,
+                OffsetXMm = isFieldTestedEpson203 ? -10 : 0,
+                OffsetYMm = 0
+            }
+        };
+    }
 
     private static void ValidateKey(string printerName, double chequeWidthMm, double chequeHeightMm)
     {

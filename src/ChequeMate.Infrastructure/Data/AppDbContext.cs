@@ -25,6 +25,11 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TemplateName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(10);
+            entity.Property(e => e.CurrencyName).HasMaxLength(100);
+            entity.Property(e => e.FractionalUnitName).HasMaxLength(50);
+            entity.Property(e => e.SpecimenReference).HasMaxLength(100);
+            entity.Property(e => e.LayoutRevision).HasMaxLength(50);
             entity.Property(e => e.VerificationStatus).HasConversion<string>();
             entity.HasOne(e => e.BankProfile)
                   .WithMany(b => b.Templates)

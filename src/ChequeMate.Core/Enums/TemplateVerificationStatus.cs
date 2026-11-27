@@ -4,5 +4,6 @@ public enum TemplateVerificationStatus
 {
     StandardTestOnly,
     LegacyCandidate,
+    SpecimenCandidate,
     Verified
 }

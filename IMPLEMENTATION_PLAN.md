@@ -102,11 +102,16 @@ ChequeMate/
 **Goal:** Bank-first selection backed by reviewed, versioned layouts.
 
 - [x] Fixed supported-bank selector
-- [x] Uganda-standard personal and corporate test formats
+- [x] Enforced BOU paper families: 165 × 73, 178 × 76, and 203 × 101.6 mm
 - [x] Verification status on every template
 - [x] Protected 16 mm MICR clear band and 51 mm restraint area
 - [x] No client-side scan/PDF importing or arbitrary template creation
-- [ ] Replace test-only layouts with verified current bank variants as specimens are approved
+- [x] Specimen-derived test presets for Bank of India, Exim, Stanbic, Centenary, and DFCU
+- [x] Shared 203 × 101.6 mm field geometry confirmed by BOI USD field test DOC531
+- [x] Keep the different 178 × 76 mm Centenary USD geometry isolated
+- [x] Currency and leaf-series selection is controlled by each preset
+- [x] Retire generic layouts without deleting historical queue data
+- [ ] Promote specimen-derived layouts to verified only after physical overlay approval
 
 ### Phase 3: Print Engine
 

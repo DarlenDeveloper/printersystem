@@ -12,9 +12,5 @@ public interface IChequeService
     Task ConfirmPrintedAsync(int id);
     Task RequeueAsync(int id);
     Task DeleteEntryAsync(int id);
-    Task<List<ChequeEntry>> ImportFromCsvAsync(
-        string filePath,
-        int templateId,
-        string currency = "",
-        string fractionalUnit = "Cents");
+    Task<List<ChequeEntry>> ImportFromCsvAsync(string filePath, int templateId);
 }

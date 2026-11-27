@@ -245,6 +245,13 @@ public class PrintService : IPrintService
 
     private static void ValidateTemplate(ChequeTemplate template)
     {
+        if (!template.IsEnabled)
+        {
+            throw new InvalidOperationException(
+                "This cheque layout has been retired because it was not backed by a reviewed specimen. " +
+                "Create a new queue entry using one of the current bank, leaf and currency presets.");
+        }
+
         if (!double.IsFinite(template.PaperWidthMm) ||
             !double.IsFinite(template.PaperHeightMm) ||
             template.PaperWidthMm <= 0 ||

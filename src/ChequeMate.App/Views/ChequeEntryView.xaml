@@ -29,21 +29,11 @@
                 <TextBlock Text="Payee Name" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <TextBox Text="{Binding Payee, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,12"/>
 
-                <Grid Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Currency wording" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBox Text="{Binding CurrencyName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Fractional unit" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBox Text="{Binding FractionalUnitName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
+                <TextBlock Text="Preset currency" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                <Border Background="#EFF6FF" BorderBrush="#93C5FD" BorderThickness="1"
+                        CornerRadius="4" Padding="8" Margin="0,2,0,12">
+                    <TextBlock Text="{Binding CurrencyDescription}" Foreground="#1E3A8A" TextWrapping="Wrap"/>
+                </Border>
 
                 <TextBlock Text="Amount" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
                 <TextBox Text="{Binding AmountFigures, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,4"/>

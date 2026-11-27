@@ -12,7 +12,7 @@ namespace ChequeMate.App;
 
 public partial class App : Application
 {
-    private const int SchemaVersion = 5;
+    private const int SchemaVersion = 6;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
@@ -59,6 +59,7 @@ public partial class App : Application
         db.Database.EnsureCreated();
         EnsureSupportedBankColumn(dbPath);
         EnsureTemplateVerificationColumn(dbPath);
+        EnsureTemplatePresetColumns(dbPath);
         UgandaTemplateSeeder.Seed(db);
 
         db.Database.ExecuteSqlRaw(
@@ -83,6 +84,45 @@ public partial class App : Application
             "ChequeTemplates",
             "VerificationStatus",
             "ALTER TABLE ChequeTemplates ADD COLUMN VerificationStatus TEXT NOT NULL DEFAULT 'StandardTestOnly'");
+    }
+
+    private static void EnsureTemplatePresetColumns(string dbPath)
+    {
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "IsEnabled",
+            "ALTER TABLE ChequeTemplates ADD COLUMN IsEnabled INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "CurrencyCode",
+            "ALTER TABLE ChequeTemplates ADD COLUMN CurrencyCode TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "CurrencyName",
+            "ALTER TABLE ChequeTemplates ADD COLUMN CurrencyName TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "FractionalUnitName",
+            "ALTER TABLE ChequeTemplates ADD COLUMN FractionalUnitName TEXT NOT NULL DEFAULT 'Cents'");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "IncludeCurrencyInWords",
+            "ALTER TABLE ChequeTemplates ADD COLUMN IncludeCurrencyInWords INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "SpecimenReference",
+            "ALTER TABLE ChequeTemplates ADD COLUMN SpecimenReference TEXT NULL");
+        EnsureColumn(
+            dbPath,
+            "ChequeTemplates",
+            "LayoutRevision",
+            "ALTER TABLE ChequeTemplates ADD COLUMN LayoutRevision TEXT NOT NULL DEFAULT ''");
     }
 
     private static void EnsureColumn(

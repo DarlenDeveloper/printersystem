@@ -5,13 +5,13 @@ The installer is a self-contained 64-bit Setup executable for Windows 10/11. Rec
 Build it on Windows PowerShell from the repository root:
 
 ```powershell
-.\installer\build-installer.ps1 -Version 2.0.0
+.\installer\build-installer.ps1 -Version 2.1.1
 ```
 
 Output:
 
-- `artifacts\installer\ChequeMate-2.0.0-win-x64-Setup.exe`
-- `artifacts\installer\ChequeMate-2.0.0-win-x64-Setup.exe.sha256`
+- `artifacts\installer\ChequeMate-2.1.1-win-x64-Setup.exe`
+- `artifacts\installer\ChequeMate-2.1.1-win-x64-Setup.exe.sha256`
 
 The setup installs for all users under Program Files and therefore requests administrator approval. It creates Start Menu and Desktop shortcuts and appears in Windows Installed Apps for upgrade or removal. NSIS is required only on the build machine.
 

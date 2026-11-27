@@ -58,14 +58,12 @@ public class ChequeServiceTests
 
             var entries = await fixture.Service.ImportFromCsvAsync(
                 filePath,
-                fixture.Template.Id,
-                "Uganda Shillings",
-                "Cents");
+                fixture.Template.Id);
 
             Assert.Single(entries);
             Assert.Equal("Acme, Ltd", entries[0].Payee);
             Assert.Equal("Invoice, November", entries[0].Memo);
-            Assert.StartsWith("Uganda Shillings", entries[0].AmountWords);
+            Assert.Equal("One Thousand Two Hundred and Fifty and Fifty Cents Only", entries[0].AmountWords);
         }
         finally
         {
@@ -106,6 +104,11 @@ public class ChequeServiceTests
             var template = new ChequeTemplate
             {
                 TemplateName = "Test",
+                IsEnabled = true,
+                CurrencyCode = "UGX",
+                CurrencyName = "Uganda Shillings",
+                FractionalUnitName = "Cents",
+                IncludeCurrencyInWords = false,
                 PaperWidthMm = 200,
                 PaperHeightMm = 90
             };

@@ -21,8 +21,7 @@ public partial class ChequeEntryViewModel : ObservableObject
     [ObservableProperty] private string _payee = string.Empty;
     [ObservableProperty] private decimal _amountFigures;
     [ObservableProperty] private string _amountWords = string.Empty;
-    [ObservableProperty] private string _currencyName = "Uganda Shillings";
-    [ObservableProperty] private string _fractionalUnitName = "Cents";
+    [ObservableProperty] private string _currencyDescription = "Choose a cheque type.";
     [ObservableProperty] private DateTime _chequeDate = DateTime.Today;
     [ObservableProperty] private string _chequeNumber = string.Empty;
     [ObservableProperty] private string _memo = string.Empty;
@@ -48,24 +47,30 @@ public partial class ChequeEntryViewModel : ObservableObject
         UpdateAmountWords();
     }
 
-    partial void OnCurrencyNameChanged(string value) => UpdateAmountWords();
-    partial void OnFractionalUnitNameChanged(string value) => UpdateAmountWords();
-
     partial void OnSelectedBankChanged(BankProfile? value) =>
         _ = LoadTemplatesForBankAsync(value?.Id);
 
     partial void OnSelectedTemplateChanged(ChequeTemplate? value)
     {
+        CurrencyDescription = value == null
+            ? "Choose a cheque type."
+            : $"{value.CurrencyDescription} — currency wording is preprinted on this leaf";
         TemplateStatusMessage = value == null
             ? "Choose a cheque type."
             : value.VerificationStatus == TemplateVerificationStatus.Verified
                 ? "VERIFIED: this layout has been approved for live use."
-                : "TEST ONLY: use plain paper or a VOID specimen. Do not use a live cheque.";
+                : $"TEST ONLY: specimen {value.SpecimenReference ?? "reference unavailable"}; " +
+                  "use plain paper or a VOID leaf. Do not use a live cheque.";
+        UpdateAmountWords();
     }
 
     private void UpdateAmountWords()
     {
-        AmountWords = _amountToWords.Convert(AmountFigures, CurrencyName, FractionalUnitName);
+        var template = SelectedTemplate;
+        AmountWords = _amountToWords.Convert(
+            AmountFigures,
+            template is { IncludeCurrencyInWords: true } ? template.CurrencyName : string.Empty,
+            template?.FractionalUnitName ?? "Cents");
     }
 
     private async Task LoadBanksAsync()
@@ -187,9 +192,7 @@ public partial class ChequeEntryViewModel : ObservableObject
             {
                 var entries = await _chequeService.ImportFromCsvAsync(
                     dialog.FileName,
-                    SelectedTemplate.Id,
-                    CurrencyName,
-                    FractionalUnitName);
+                    SelectedTemplate.Id);
                 StatusMessage = $"Imported {entries.Count} cheques from CSV.";
             }
             catch (Exception ex)

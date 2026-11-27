@@ -58,7 +58,14 @@ public class ChequeService : IChequeService
     public async Task<ChequeEntry> CreateEntryAsync(ChequeEntry entry)
     {
         if (string.IsNullOrEmpty(entry.AmountWords))
-            entry.AmountWords = _amountToWords.Convert(entry.AmountFigures);
+        {
+            var template = await _db.ChequeTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == entry.TemplateId)
+                ?? throw new InvalidOperationException("The selected cheque preset no longer exists.");
+            EnsureTemplateEnabled(template);
+            entry.AmountWords = ConvertAmount(entry.AmountFigures, template);
+        }
 
         entry.CreatedAt = DateTime.UtcNow;
         _db.ChequeEntries.Add(entry);
@@ -108,14 +115,15 @@ public class ChequeService : IChequeService
         }
     }
 
-    public async Task<List<ChequeEntry>> ImportFromCsvAsync(
-        string filePath,
-        int templateId,
-        string currency = "",
-        string fractionalUnit = "Cents")
+    public async Task<List<ChequeEntry>> ImportFromCsvAsync(string filePath, int templateId)
     {
         var entries = new List<ChequeEntry>();
         var lines = await File.ReadAllLinesAsync(filePath);
+        var template = await _db.ChequeTemplates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == templateId)
+            ?? throw new InvalidOperationException("The selected cheque preset no longer exists.");
+        EnsureTemplateEnabled(template);
 
         // Expect CSV format: Payee,Amount,Date,ChequeNumber,Memo
         foreach (var line in lines.Skip(1)) // skip header
@@ -138,7 +146,7 @@ public class ChequeService : IChequeService
                 TemplateId = templateId,
                 Payee = payee,
                 AmountFigures = amount,
-                AmountWords = _amountToWords.Convert(amount, currency, fractionalUnit),
+                AmountWords = ConvertAmount(amount, template),
                 ChequeDate = date,
                 ChequeNumber = chequeNumber,
                 Memo = memo
@@ -190,4 +198,19 @@ public class ChequeService : IChequeService
 
     private static string? NullIfWhiteSpace(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private string ConvertAmount(decimal amount, ChequeTemplate template) =>
+        _amountToWords.Convert(
+            amount,
+            template.IncludeCurrencyInWords ? template.CurrencyName : string.Empty,
+            template.FractionalUnitName);
+
+    private static void EnsureTemplateEnabled(ChequeTemplate template)
+    {
+        if (!template.IsEnabled)
+        {
+            throw new InvalidOperationException(
+                "This cheque preset has been retired. Choose a current specimen-backed preset.");
+        }
+    }
 }

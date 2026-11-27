@@ -29,8 +29,6 @@ public class ChequePrintEngine
             float width = (float)field.WidthMm;
             float height = (float)field.HeightMm;
 
-            var fontStyle = field.IsBold ? FontStyle.Bold : FontStyle.Regular;
-            using var font = new Font(field.FontFamily, (float)field.FontSizePt, fontStyle);
             using var brush = new SolidBrush(Color.Black);
 
             using var format = new StringFormat();
@@ -41,10 +39,13 @@ public class ChequePrintEngine
                 _ => StringAlignment.Near
             };
             format.LineAlignment = StringAlignment.Center;
-            format.Trimming = StringTrimming.EllipsisCharacter;
+            format.Trimming = StringTrimming.None;
+            format.FormatFlags = StringFormatFlags.LineLimit;
+            if (field.FieldType != FieldType.AmountInWords)
+                format.FormatFlags |= StringFormatFlags.NoWrap;
 
             var rect = new RectangleF(x, y, width, height);
-            graphics.DrawString(text, font, brush, rect, format);
+            DrawFittedText(graphics, text, field, rect, format, brush);
         }
     }
 
@@ -87,6 +88,7 @@ public class ChequePrintEngine
         graphics.DrawString("PROTECTED MICR CLEAR BAND - DO NOT PRINT", font, brush, 3, clearBandTop + 3);
         graphics.FillRectangle(protectedBrush, restraintLeft, 0, (float)UgandaChequeStandardValidator.RestraintAreaWidthMm, clearBandTop);
         graphics.DrawRectangle(protectedPen, restraintLeft, 0, (float)UgandaChequeStandardValidator.RestraintAreaWidthMm, clearBandTop);
+        graphics.DrawString("CONTROLLED 51 mm RESTRAINT AREA", font, brush, restraintLeft + 2, 2);
 
         // Draw field outlines with labels
         using var fieldPen = new Pen(Color.Red, 0.3f);
@@ -110,12 +112,53 @@ public class ChequePrintEngine
             FieldType.Payee => entry.Payee,
             FieldType.Date => entry.ChequeDate.ToString("dd/MM/yyyy"),
             FieldType.AmountInWords => entry.AmountWords,
-            FieldType.AmountInFigures => entry.AmountFigures.ToString("#,##0.00", CultureInfo.InvariantCulture),
+            FieldType.AmountInFigures =>
+                $"**{entry.AmountFigures.ToString("#,##0.00", CultureInfo.InvariantCulture)}**",
             FieldType.AccountPayee => "A/C Payee Only",
             FieldType.ChequeNumber => entry.ChequeNumber ?? "",
             FieldType.Memo => entry.Memo ?? "",
             FieldType.Custom => field.Label ?? "",
             _ => ""
         };
+    }
+
+    private static void DrawFittedText(
+        Graphics graphics,
+        string text,
+        TemplateField field,
+        RectangleF rect,
+        StringFormat format,
+        Brush brush)
+    {
+        var fontStyle = field.IsBold ? FontStyle.Bold : FontStyle.Regular;
+        var minimumSize = field.FieldType switch
+        {
+            FieldType.AmountInWords => 7f,
+            FieldType.Payee => 7f,
+            FieldType.AmountInFigures => 7.5f,
+            _ => 8f
+        };
+
+        for (var size = (float)field.FontSizePt; size >= minimumSize; size -= 0.5f)
+        {
+            using var font = new Font(field.FontFamily, size, fontStyle);
+            graphics.MeasureString(
+                text,
+                font,
+                new SizeF(rect.Width, rect.Height),
+                format,
+                out var charactersFitted,
+                out _);
+
+            if (charactersFitted < text.Length)
+                continue;
+
+            graphics.DrawString(text, font, brush, rect, format);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The {field.Label ?? field.FieldType.ToString()} text does not fit its approved cheque area. " +
+            "Shorten the payee or reduce the amount wording before printing.");
     }
 }

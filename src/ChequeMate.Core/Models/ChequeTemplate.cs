@@ -9,6 +9,25 @@ public class ChequeTemplate
     public string TemplateName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Disabled templates remain readable for historical queue entries but cannot
+    /// be selected for a new cheque or submitted to a printer.
+    /// </summary>
+    public bool IsEnabled { get; set; }
+
+    public string CurrencyCode { get; set; } = string.Empty;
+    public string CurrencyName { get; set; } = string.Empty;
+    public string FractionalUnitName { get; set; } = "Cents";
+
+    /// <summary>
+    /// False when the physical cheque already prints the currency wording before
+    /// the amount-in-words line.
+    /// </summary>
+    public bool IncludeCurrencyInWords { get; set; }
+
+    public string? SpecimenReference { get; set; }
+    public string LayoutRevision { get; set; } = string.Empty;
+
+    /// <summary>
     /// Physical width of the cheque in millimeters.
     /// </summary>
     public double PaperWidthMm { get; set; }
@@ -34,11 +53,16 @@ public class ChequeTemplate
     public string VerificationLabel => VerificationStatus switch
     {
         TemplateVerificationStatus.Verified => "Verified for live use",
+        TemplateVerificationStatus.SpecimenCandidate => "Specimen-derived - test only",
         TemplateVerificationStatus.LegacyCandidate => "Legacy candidate - test only",
         _ => "Uganda standard base - test only"
     };
 
     public string DisplayName => $"{TemplateName} [{VerificationLabel}]";
+
+    public string CurrencyDescription => string.IsNullOrWhiteSpace(CurrencyCode)
+        ? CurrencyName
+        : $"{CurrencyCode} — {CurrencyName}";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

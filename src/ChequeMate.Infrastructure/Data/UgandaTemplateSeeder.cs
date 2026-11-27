@@ -6,10 +6,19 @@ namespace ChequeMate.Infrastructure.Data;
 
 public static class UgandaTemplateSeeder
 {
-    // Uganda Bankers' Association member banks and deposit-taking institutions
-    // selected for the client bank picker. Non-bank development institutions and
-    // MDIs that do not issue ordinary cheque books are intentionally excluded.
-    private static readonly string[] SupportedBanks =
+    private const string LayoutRevision = "2026-11-27-field-test-1";
+
+    // Confirmed by the 27 Nov 2026 Bank of India USD field test (DOC531.pdf).
+    // The operator confirmed that the 203 x 101.6 mm leaves for BOI, DFCU,
+    // Stanbic, Exim and Centenary UGX use the same writable field geometry.
+    // Printer-specific movement (EPSON L220: X -10 mm, Y 0 mm in the test)
+    // remains in PrinterProfileService and is shared by physical paper size.
+    private static readonly FieldBox SharedCorporate203Payee = new(10, 43, 133, 8);
+    private static readonly FieldBox SharedCorporate203AmountWords = new(30, 56, 113, 19);
+
+    // Retained as the known institution catalogue. Only banks with specimen-backed
+    // presets are marked supported and exposed in the client picker.
+    private static readonly string[] KnownBanks =
     [
         "ABC Capital Bank Uganda",
         "Absa Bank Uganda Limited",
@@ -42,103 +51,218 @@ public static class UgandaTemplateSeeder
         "Yako Bank Uganda Limited"
     ];
 
+    private static readonly PresetDefinition[] Presets =
+    [
+        new(
+            "Bank of India (Uganda) Limited",
+            "Corporate 203 x 101.6 mm — UGX — specimen",
+            "UGX", "Uganda Shillings", "Cents", "DOC517.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "Bank of India (Uganda) Limited",
+            "Corporate 203 x 101.6 mm — USD — specimen",
+            "USD", "US Dollars", "Cents", "DOC523.pdf; field test DOC531.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "Exim Bank Uganda Limited",
+            "Corporate 203 x 101.6 mm — USD — specimen",
+            "USD", "US Dollars", "Cents", "DOC518.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "Stanbic Bank Uganda Limited",
+            "Corporate 203 x 101.6 mm — USD — specimen",
+            "USD", "US Dollars", "Cents", "DOC519.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "Stanbic Bank Uganda Limited",
+            "Corporate 203 x 101.6 mm — UGX — specimen",
+            "UGX", "Uganda Shillings", "Cents", "DOC520.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "Centenary Rural Development Bank Limited",
+            "Corporate 178 x 76 mm — USD — specimen",
+            "USD", "US Dollars", "Cents", "DOC521.pdf",
+            178, 76, false,
+            new FieldBox(10, 26, 107, 8),
+            new FieldBox(30, 37, 87, 17)),
+        new(
+            "Centenary Rural Development Bank Limited",
+            "Corporate 203 x 101.6 mm — UGX — specimen",
+            "UGX", "Uganda Shillings", "Cents", "DOC522.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords),
+        new(
+            "DFCU Bank Limited",
+            "Corporate 203 x 101.6 mm — USD — specimen",
+            "USD", "US Dollars", "Cents", "DOC530.pdf",
+            203, 101.6, true,
+            SharedCorporate203Payee,
+            SharedCorporate203AmountWords)
+    ];
+
     public static void Seed(AppDbContext db)
     {
-        var existingBanks = db.BankProfiles
+        var banks = db.BankProfiles
             .Include(bank => bank.Templates)
             .ThenInclude(template => template.Fields)
             .ToList();
 
-        foreach (var bankName in SupportedBanks)
+        foreach (var bank in banks)
+            bank.IsSupported = false;
+
+        foreach (var bankName in KnownBanks)
         {
-            var bank = existingBanks.FirstOrDefault(item =>
+            var bank = banks.FirstOrDefault(item =>
                 string.Equals(item.BankName, bankName, StringComparison.OrdinalIgnoreCase));
 
             if (bank == null)
             {
-                bank = new BankProfile
-                {
-                    BankName = bankName,
-                    Country = "Uganda",
-                    IsSupported = true
-                };
+                bank = new BankProfile { BankName = bankName };
                 db.BankProfiles.Add(bank);
-                existingBanks.Add(bank);
-            }
-            else
-            {
-                bank.Country = "Uganda";
-                bank.IsSupported = true;
+                banks.Add(bank);
             }
 
-            AddStandardTemplateIfMissing(bank, "Personal - 165 x 73 mm - TEST ONLY", 165, 73, false);
-            AddStandardTemplateIfMissing(bank, "Corporate - 178 x 76 mm - TEST ONLY", 178, 76, true);
-            AddStandardTemplateIfMissing(bank, "Corporate - 203 x 101.6 mm - TEST ONLY", 203, 101.6, true);
+            bank.Country = "Uganda";
+            bank.IsSupported = Presets.Any(preset =>
+                string.Equals(preset.BankName, bankName, StringComparison.OrdinalIgnoreCase));
+
+            // Generic layouts from earlier releases are retained for audit/history,
+            // but they can no longer be selected or printed.
+            foreach (var template in bank.Templates)
+                template.IsEnabled = false;
+        }
+
+        foreach (var preset in Presets)
+        {
+            var bank = banks.Single(item =>
+                string.Equals(item.BankName, preset.BankName, StringComparison.OrdinalIgnoreCase));
+            UpsertPreset(db, bank, preset);
         }
 
         db.SaveChanges();
     }
 
-    private static void AddStandardTemplateIfMissing(
+    private static void UpsertPreset(
+        AppDbContext db,
         BankProfile bank,
-        string name,
-        double width,
-        double height,
-        bool corporate)
+        PresetDefinition preset)
     {
-        if (bank.Templates.Any(template =>
-                string.Equals(template.TemplateName, name, StringComparison.OrdinalIgnoreCase)))
-            return;
+        var template = bank.Templates.FirstOrDefault(item =>
+            string.Equals(item.TemplateName, preset.TemplateName, StringComparison.OrdinalIgnoreCase));
+        var isNew = template == null;
+        template ??= new ChequeTemplate();
 
-        var template = new ChequeTemplate
+        template.TemplateName = preset.TemplateName;
+        template.IsEnabled = true;
+        template.CurrencyCode = preset.CurrencyCode;
+        template.CurrencyName = preset.CurrencyName;
+        template.FractionalUnitName = preset.FractionalUnitName;
+        template.IncludeCurrencyInWords = false;
+        template.SpecimenReference = preset.SpecimenReference;
+        template.LayoutRevision = LayoutRevision;
+        template.PaperWidthMm = preset.PaperWidthMm;
+        template.PaperHeightMm = preset.PaperHeightMm;
+        template.OffsetXMm = 0;
+        template.OffsetYMm = 0;
+        template.VerificationStatus = TemplateVerificationStatus.SpecimenCandidate;
+        template.UpdatedAt = DateTime.UtcNow;
+
+        if (!isNew)
         {
-            TemplateName = name,
-            PaperWidthMm = width,
-            PaperHeightMm = height,
-            VerificationStatus = TemplateVerificationStatus.StandardTestOnly
-        };
+            db.TemplateFields.RemoveRange(template.Fields);
+            template.Fields.Clear();
+        }
 
-        var restraintLeft = width - 51;
-        var unrestrainedRight = width - 53;
-        var amountTop = corporate ? height - 54 : height - 44;
-        var dateBaseline = corporate ? height - 63.5 : height - 54;
+        AddFields(template, preset);
 
-        template.Fields.Add(CreateField(
-            FieldType.Payee, "Payee", 15, corporate ? 20 : 19,
-            unrestrainedRight - 15, 8, 10));
-        template.Fields.Add(CreateField(
-            FieldType.AmountInWords, "Amount in words", 15, corporate ? 34 : 34,
-            unrestrainedRight - 15, corporate && height > 80 ? 16 : 13, 9));
-        template.Fields.Add(CreateField(
-            FieldType.Date, "Date", restraintLeft + 3, Math.Max(2, dateBaseline - 8),
-            43, 8, 10, TextAlignment.Right));
-        template.Fields.Add(CreateField(
-            FieldType.AmountInFigures, "Amount in figures", width - 46, amountTop,
-            41, 9.5, 10, TextAlignment.Right, true));
+        if (isNew)
+            bank.Templates.Add(template);
+    }
 
-        bank.Templates.Add(template);
+    private static void AddFields(ChequeTemplate template, PresetDefinition preset)
+    {
+        template.Fields.Add(CreateField(
+            FieldType.Payee,
+            "Payee",
+            preset.Payee,
+            10));
+        template.Fields.Add(CreateField(
+            FieldType.AmountInWords,
+            "Amount in words",
+            preset.AmountWords,
+            9));
+
+        var dateBaselineFromBottom = preset.UseCorporateAlternative ? 63.5 : 54;
+        var date = new FieldBox(
+            preset.PaperWidthMm - 48,
+            preset.PaperHeightMm - dateBaselineFromBottom - 8,
+            43,
+            8);
+        template.Fields.Add(CreateField(
+            FieldType.Date,
+            "Date",
+            date,
+            10,
+            TextAlignment.Right));
+
+        var amountUpperEdgeFromBottom = preset.UseCorporateAlternative ? 54 : 44;
+        var amount = new FieldBox(
+            preset.PaperWidthMm - 46,
+            preset.PaperHeightMm - amountUpperEdgeFromBottom,
+            41,
+            9.5);
+        template.Fields.Add(CreateField(
+            FieldType.AmountInFigures,
+            "Amount in figures",
+            amount,
+            9,
+            TextAlignment.Left,
+            true));
     }
 
     private static TemplateField CreateField(
         FieldType type,
         string label,
-        double x,
-        double y,
-        double width,
-        double height,
+        FieldBox box,
         double fontSize,
         TextAlignment alignment = TextAlignment.Left,
         bool bold = false) => new()
         {
             FieldType = type,
             Label = label,
-            PositionXMm = x,
-            PositionYMm = y,
-            WidthMm = width,
-            HeightMm = height,
+            PositionXMm = box.X,
+            PositionYMm = box.Y,
+            WidthMm = box.Width,
+            HeightMm = box.Height,
             FontFamily = "Arial",
             FontSizePt = fontSize,
             Alignment = alignment,
             IsBold = bold
         };
+
+    private sealed record PresetDefinition(
+        string BankName,
+        string TemplateName,
+        string CurrencyCode,
+        string CurrencyName,
+        string FractionalUnitName,
+        string SpecimenReference,
+        double PaperWidthMm,
+        double PaperHeightMm,
+        bool UseCorporateAlternative,
+        FieldBox Payee,
+        FieldBox AmountWords);
+
+    private readonly record struct FieldBox(double X, double Y, double Width, double Height);
 }

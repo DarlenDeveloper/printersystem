@@ -1,10 +1,10 @@
-# ChequeMate 2.0 - Windows testing guide
+# ChequeMate 2.1.1 - Windows testing guide
 
 ChequeMate prints variable text onto pre-printed Ugandan bank cheque leaves. It does not print bank artwork or MICR encoding.
 
 ## Safety status
 
-- The included bank layouts are marked **TEST ONLY**.
+- The included specimen-derived bank layouts are marked **TEST ONLY**.
 - Use full A4 test sheets, cut blank sheets, or cheques clearly marked **VOID**.
 - Do not use a live cheque until its bank-specific layout and printing method have been approved.
 - The bottom MICR clear band and right-hand restraint area remain protected.
@@ -16,7 +16,28 @@ ChequeMate prints variable text onto pre-printed Ugandan bank cheque leaves. It 
 - Epson L220, Canon MAXIFY GX7040, or another installed Windows printer
 - Plain A4 sheets for the first alignment test
 
-Clients do not import scans or PDFs and do not create Windows paper forms. They choose a built-in bank and cheque type.
+Clients do not import scans or PDFs and do not create Windows paper forms. They choose a built-in bank, physical leaf size and currency. ChequeMate automatically omits currency wording when it is already preprinted on the leaf.
+
+## Included specimen presets
+
+- Bank of India (Uganda): 203 × 101.6 mm, UGX and USD
+- Exim Bank Uganda: 203 × 101.6 mm, USD
+- Stanbic Bank Uganda: 203 × 101.6 mm, UGX and USD
+- Centenary Bank: 178 × 76 mm USD and 203 × 101.6 mm UGX
+- DFCU Bank: 203 × 101.6 mm, USD
+
+The 203 × 101.6 mm presets use one field-tested writable geometry for Bank of
+India, DFCU, Stanbic, Exim and Centenary UGX. Centenary USD is a different
+178 × 76 mm leaf and keeps its own geometry. The shared 203 mm geometry was
+confirmed on the Bank of India USD field test `DOC531.pdf` on 27 November 2026.
+
+ChequeMate enforces the BOU paper families and protected geometry:
+
+- Personal: 165 × 73 mm
+- Corporate: 178 × 76 mm or 203 × 101.6 mm
+- Bottom 16 mm: protected MICR clear band; ordinary application text is blocked
+- Right 51 mm above the clear band: controlled restraint area for date and amount fields
+- Long payees or amount wording are reduced within a safe font range; printing stops instead of adding an ellipsis when text still cannot fit
 
 ## First-time workflow
 
@@ -26,7 +47,7 @@ Open **New Cheque**, choose the bank and cheque type, enter the data, and select
 
 ### 2. Open printer setup
 
-Open **Print Queue** and select the queued cheque. Printer settings are saved separately for every printer and physical cheque size.
+Open **Print Queue** and select the queued cheque. Printer settings are saved separately for every printer and physical cheque size. Layouts with the same physical size automatically share the saved printer setup.
 
 Choose:
 
@@ -36,6 +57,12 @@ Choose:
 - **Feed direction**: normally **Long edge first** for the 203 x 101.6 mm corporate format.
 - **Paper guide position**: start with **Right guide** and use the same guide every time.
 - **Calibration X/Y**: leave both at `0` for the first test.
+
+For the Epson L220 used in the 27 November 2026 Bank of India test, the confirmed
+setup was A4 positioned, rear paper feed, long edge first, right guide,
+Calibration X `-10` mm and Y `0` mm. Save it once and ChequeMate will reuse it
+for all 203 × 101.6 mm presets on that printer. Do not assume the same offset for
+a different printer.
 
 No custom paper form is required in A4-positioned mode.
 

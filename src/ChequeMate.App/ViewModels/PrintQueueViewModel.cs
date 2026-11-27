@@ -391,7 +391,12 @@ public partial class PrintQueueViewModel : ObservableObject
                 ? profile.PaperSourceName
                 : FindPreferredPaperSource(PaperSources.Where(item => item != DefaultPaperSource)) ?? DefaultPaperSource;
             SetupStatusMessage = profile.UpdatedAt == default
-                ? "Recommended setup loaded. Run Alignment Test, then save any corrections."
+                ? profile.Options.OffsetXMm == -10 &&
+                  SelectedPrinter.Contains("L220", StringComparison.OrdinalIgnoreCase) &&
+                  Math.Abs(template.PaperWidthMm - 203) < 0.05 &&
+                  Math.Abs(template.PaperHeightMm - 101.6) < 0.05
+                    ? "Field-tested Epson L220 setup loaded (X -10 mm, Y 0 mm). Run Alignment Test, then save any corrections."
+                    : "Recommended setup loaded. Run Alignment Test, then save any corrections."
                 : $"Saved setup loaded (updated {profile.UpdatedAt.ToLocalTime():g}).";
         }
         catch (Exception ex)

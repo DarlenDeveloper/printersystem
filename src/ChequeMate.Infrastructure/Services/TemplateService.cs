@@ -20,6 +20,7 @@ public class TemplateService : ITemplateService
             .AsNoTracking()
             .Include(t => t.BankProfile)
             .Include(t => t.Fields)
+            .Where(t => t.IsEnabled)
             .OrderBy(t => t.TemplateName)
             .ToListAsync();
     }
@@ -38,7 +39,7 @@ public class TemplateService : ITemplateService
         return await _db.ChequeTemplates
             .AsNoTracking()
             .Include(t => t.Fields)
-            .Where(t => t.BankProfileId == bankProfileId)
+            .Where(t => t.BankProfileId == bankProfileId && t.IsEnabled)
             .ToListAsync();
     }
 
